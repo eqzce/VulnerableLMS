@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UniMoodle — Academic Course & Grade Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-50 text-slate-800 font-sans antialiased">
+    <!-- Top Compact Lab Control Strip (Difficulty & Real OWASP Coraza WAF) -->
+    <div class="bg-slate-900 text-slate-200 text-xs border-b border-slate-800">
+        <div class="max-w-6xl mx-auto px-4 py-2 flex flex-wrap items-center justify-between gap-3">
+            <form action="{{ url_for('update_settings') }}" method="POST" class="flex flex-wrap items-center gap-2">
+                <div class="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-md px-2.5 py-1">
+                    <span class="text-slate-400">Code Security:</span>
+                    <select name="difficulty" onchange="this.form.submit()" class="bg-transparent font-semibold text-white focus:outline-none cursor-pointer">
+                        <option value="low" class="bg-slate-900 text-rose-300" {{ 'selected' if settings.difficulty == 'low' }}>Low (Vulnerable)</option>
+                        <option value="medium" class="bg-slate-900 text-amber-300" {{ 'selected' if settings.difficulty == 'medium' }}>Medium (Filter - Bypassable)</option>
+                        <option value="high" class="bg-slate-900 text-purple-300" {{ 'selected' if settings.difficulty == 'high' }}>High (Strict - Bypassable)</option>
+                        <option value="impossible" class="bg-slate-900 text-emerald-300" {{ 'selected' if settings.difficulty == 'impossible' }}>Impossible (Patched)</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-md px-2.5 py-1">
+                    <span class="text-slate-400">OWASP Coraza WAF:</span>
+                    <select name="waf_mode" onchange="this.form.submit()" class="bg-transparent font-semibold text-white focus:outline-none cursor-pointer">
+                        <option value="off" class="bg-slate-900 text-rose-300" {{ 'selected' if settings.waf_mode == 'off' }}>OFF (SecRuleEngine Off)</option>
+                        <option value="detect" class="bg-slate-900 text-amber-300" {{ 'selected' if settings.waf_mode == 'detect' }}>DETECT (DetectionOnly)</option>
+                        <option value="block" class="bg-slate-900 text-emerald-300" {{ 'selected' if settings.waf_mode == 'block' }}>BLOCK (SecRuleEngine On / 403)</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-md px-2.5 py-1">
+                    <span class="text-slate-400">CRS Paranoia:</span>
+                    <select name="waf_paranoia" onchange="this.form.submit()" class="bg-transparent font-semibold text-white focus:outline-none cursor-pointer">
+                        <option value="1" class="bg-slate-900" {{ 'selected' if settings.waf_paranoia == '1' }}>L1 (Basic SecRules)</option>
+                        <option value="2" class="bg-slate-900" {{ 'selected' if settings.waf_paranoia == '2' }}>L2 (Strict + Headers SecRules)</option>
+                    </select>
+                </div>
+            </form>
+
+            <!-- Dedicated Hints, Scanner & Coraza WAF Links -->
+            <div class="flex items-center gap-2">
+                <a href="{{ url_for('hints_page') }}" class="px-2.5 py-1 rounded-md font-medium transition {{ 'bg-amber-500 text-slate-950 font-semibold' if request.path == '/hints' else 'bg-slate-800 hover:bg-slate-700 text-amber-300' }}">
+                    💡 Hints & Payloads
+                </a>
+                <a href="{{ url_for('auto_scanner') }}" class="px-2.5 py-1 rounded-md font-medium transition {{ 'bg-blue-600 text-white font-semibold' if request.path == '/scanner' else 'bg-slate-800 hover:bg-slate-700 text-blue-300' }}">
+                    ⚡ Auto-Scanner
+                </a>
+                <a href="{{ url_for('waf_dashboard') }}" class="px-2.5 py-1 rounded-md font-medium transition {{ 'bg-emerald-600 text-white font-semibold' if request.path == '/waf-dashboard' else 'bg-slate-800 hover:bg-slate-700 text-emerald-300' }}">
+                    🛡️ Coraza WAF ({{ waf_stats.total }})
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main University Moodle Navigation Header -->
+    <header class="bg-white border-b border-slate-200 shadow-sm">
+        <div class="max-w-6xl mx-auto px-4 py-3.5 flex flex-wrap items-center justify-between gap-4">
+            <a href="{{ url_for('sqli_lab') }}" class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-lg shadow-sm">
+                    🎓
+                </div>
+                <div>
+                    <span class="text-lg font-bold tracking-tight text-slate-900">Uni<span class="text-blue-600">Moodle</span></span>
+                    <span class="block text-[11px] text-slate-500 -mt-1">CS-404 Learning Management System</span>
+                </div>
+            </a>
+
+            <nav class="flex items-center gap-1.5 text-sm font-medium">
+                <a href="{{ url_for('sqli_lab') }}"
+                   class="px-3.5 py-2 rounded-lg transition {{ 'bg-blue-50 text-blue-700 font-semibold border border-blue-200' if request.path == '/sqli' else 'text-slate-600 hover:bg-slate-100' }}">
+                    📊 Gradebook
+                </a>
+                <a href="{{ url_for('xss_lab') }}"
+                   class="px-3.5 py-2 rounded-lg transition {{ 'bg-blue-50 text-blue-700 font-semibold border border-blue-200' if request.path == '/xss' else 'text-slate-600 hover:bg-slate-100' }}">
+                    💬 Course Forum
+                </a>
+                <a href="{{ url_for('vault_lab') }}"
+                   class="px-3.5 py-2 rounded-lg transition {{ 'bg-blue-50 text-blue-700 font-semibold border border-blue-200' if request.path == '/vault' else 'text-slate-600 hover:bg-slate-100' }}">
+                    🏛️ Dean's Office
+                </a>
+            </nav>
+
+            <div class="text-xs text-slate-500 flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span>Student Session: <strong class="text-slate-700">guest</strong></span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Flash Notifications -->
+    <div class="max-w-6xl mx-auto w-full px-4 mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="mb-3 px-4 py-3 rounded-xl border text-xs font-medium
+                        {{ 'bg-emerald-50 border-emerald-200 text-emerald-800' if category == 'success' else
+                           ('bg-amber-50 border-amber-200 text-amber-800' if category == 'warning' else
+                            'bg-blue-50 border-blue-200 text-blue-800') }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Main Page Content -->
+    <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-6 space-y-6">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="border-t border-slate-200 bg-white py-4 mt-12">
+        <div class="max-w-6xl mx-auto px-4 flex flex-wrap items-center justify-between text-xs text-slate-500">
+            <span>UniMoodle Academic Portal • Protected by <strong>OWASP Coraza WAF + Caddy Reverse Proxy (:5001)</strong></span>
+            <span>Difficulty: <strong class="uppercase text-slate-700">{{ settings.difficulty }}</strong> | Coraza WAF: <strong class="uppercase text-slate-700">{{ settings.waf_mode }} (L{{ settings.waf_paranoia }})</strong></span>
+        </div>
+    </footer>
+</body>
+</html>

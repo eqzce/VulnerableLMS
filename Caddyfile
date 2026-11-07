@@ -1,0 +1,23 @@
+{
+    admin 127.0.0.1:2019
+    grace_period 1ms
+    order coraza_waf first
+}
+
+:5001 {
+    coraza_waf {
+        directives `
+            # Revision: 1794056717.573904
+            Include c:/Users/Ersultan/Desktop/WebSec/moodle_portal/coraza_rules.conf
+        `
+    }
+    reverse_proxy 127.0.0.1:5002
+    handle_errors {
+        rewrite * /coraza-blocked
+        reverse_proxy 127.0.0.1:5002 {
+            method GET
+            header_up -Content-Length
+            header_up -Content-Type
+        }
+    }
+}

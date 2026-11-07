@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block content %}
+<!-- Course Forum Header -->
+<div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm flex flex-wrap items-center justify-between gap-4">
+    <div>
+        <div class="text-xs font-semibold uppercase tracking-wider text-blue-600">CS-404 • Student Discussion Board</div>
+        <h1 class="text-xl font-bold text-slate-900 mt-1">Course Q&A and Assignment Forum</h1>
+        <p class="text-sm text-slate-600 mt-0.5">
+            Search discussion topics or post questions for your classmates and teaching assistants.
+        </p>
+    </div>
+    <form action="{{ url_for('clear_comments') }}" method="POST">
+        <button type="submit" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-200 text-xs font-medium text-slate-700 transition">
+            Reset Forum Posts
+        </button>
+    </form>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <!-- Left: Topic Search & New Post Form -->
+    <div class="lg:col-span-5 space-y-6">
+        <!-- Search Discussions (Reflected XSS) -->
+        <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
+            <h2 class="text-sm font-bold text-slate-900">🔎 Filter Forum Topics</h2>
+            <form action="{{ url_for('xss_lab') }}" method="GET" class="space-y-3">
+                <input type="text" name="reflect" value="{{ reflected_raw }}" placeholder="Search forum keywords..."
+                       class="w-full px-3.5 py-2 rounded-lg bg-white border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-blue-600">
+                <div class="flex gap-2">
+                    <button type="submit" class="flex-1 py-2 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition">
+                        Search Forum
+                    </button>
+                    <a href="{{ url_for('xss_lab') }}" class="py-2 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs transition">
+                        Reset
+                    </a>
+                </div>
+            </form>
+
+            {% if reflected_raw %}
+            <div class="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1 text-xs">
+                <div class="text-slate-500">Showing results for topic query:</div>
+                <div class="font-medium text-slate-900 p-2 bg-white rounded border border-slate-200">
+                    {% if settings.difficulty == 'impossible' %}
+                        {{ reflected_output }}
+                    {% else %}
+                        {{ reflected_output | safe }}
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Post New Reply (Stored XSS) -->
+        <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
+            <h2 class="text-sm font-bold text-slate-900">✍️ Post a New Question / Reply</h2>
+            <form action="{{ url_for('xss_lab') }}" method="POST" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Your Name</label>
+                    <input type="text" name="author" value="Alice Mercer (Student)" required
+                           class="w-full px-3.5 py-2 rounded-lg bg-white border border-slate-300 text-xs text-slate-900">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Message Content</label>
+                    <textarea name="content" rows="3" placeholder="Write your question or comment here..." required
+                              class="w-full px-3.5 py-2 rounded-lg bg-white border border-slate-300 text-xs text-slate-900"></textarea>
+                </div>
+                <button type="submit" class="w-full py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition">
+                    Publish to Course Forum
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Right: Forum Thread Feed -->
+    <div class="lg:col-span-7 bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h2 class="text-sm font-bold text-slate-900">💬 Recent Course Announcements & Student Posts</h2>
+            <span class="text-xs text-slate-500">{{ comments|length }} post(s)</span>
+        </div>
+
+        <div class="space-y-3">
+            {% for c in comments %}
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                <div class="flex items-center justify-between text-xs">
+                    <span class="font-bold text-blue-700">{{ c.author }}</span>
+                    <span class="text-slate-400 font-mono text-[11px]">{{ c.created_at }}</span>
+                </div>
+                <div class="text-sm text-slate-800">
+                    {% if settings.difficulty == 'impossible' %}
+                        {{ c.content }}
+                    {% else %}
+                        {{ c.content | safe }}
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+<script>
+    if (window.location.search.includes('reflect=')) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+</script>
+{% endblock %}

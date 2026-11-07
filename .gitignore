@@ -1,0 +1,23 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment
+.env
+env/
+venv/
+ENV/
+
+# Database & Logs
+*.db
+*.log
+coraza_audit.log
+
+# Large binaries (downloaded automatically on first launch)
+coraza-waf.exe
+
+# IDE / OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

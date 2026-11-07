@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm flex flex-wrap items-center justify-between gap-4">
+    <div>
+        <div class="text-xs font-semibold uppercase tracking-wider text-blue-600">AUTOMATED EXPLOIT VERIFICATION</div>
+        <h1 class="text-xl font-bold text-slate-900 mt-1">⚡ 9-Vector Vulnerability & WAF Scanner</h1>
+        <p class="text-sm text-slate-600 mt-0.5">
+            Automatically dispatches all 9 exploit vectors (Low, Medium, High across SQLi, XSS, and Burp Tampering) against active Difficulty (<code class="font-mono font-bold text-slate-800">{{ settings.difficulty|upper }}</code>) and WAF (<code class="font-mono font-bold text-slate-800">{{ settings.waf_mode|upper }} L{{ settings.waf_paranoia }}</code>).
+        </p>
+    </div>
+    <form action="{{ url_for('auto_scanner') }}" method="POST">
+        <button type="submit" class="px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition shadow-sm">
+            🚀 Run All 9 Exploit Vectors
+        </button>
+    </form>
+</div>
+
+{% if scan_summary %}
+<div class="grid grid-cols-3 gap-4">
+    <div class="p-4 rounded-xl bg-white border border-slate-200 text-center shadow-sm">
+        <div class="text-xs text-slate-500">Total Payloads Sent</div>
+        <div class="text-2xl font-bold text-slate-900 mt-1">{{ scan_summary.total }}</div>
+    </div>
+    <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-center shadow-sm">
+        <div class="text-xs text-emerald-700">Blocked / Mitigated</div>
+        <div class="text-2xl font-bold text-emerald-800 mt-1">{{ scan_summary.protected }}</div>
+    </div>
+    <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-center shadow-sm">
+        <div class="text-xs text-rose-700">Exploited (Vulnerable)</div>
+        <div class="text-2xl font-bold text-rose-800 mt-1">{{ scan_summary.exploited }}</div>
+    </div>
+</div>
+
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <table class="w-full text-left border-collapse text-xs">
+        <thead>
+            <tr class="border-b border-slate-200 bg-slate-50 text-slate-500 font-mono uppercase">
+                <th class="py-3 px-4">ID</th>
+                <th class="py-3 px-4">Attack Vector</th>
+                <th class="py-3 px-4">Category</th>
+                <th class="py-3 px-4">Payload</th>
+                <th class="py-3 px-4">HTTP</th>
+                <th class="py-3 px-4">Outcome</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200 font-mono">
+            {% for r in scan_results %}
+            <tr class="hover:bg-slate-50">
+                <td class="py-3 px-4 text-blue-600 font-bold">{{ r.id }}</td>
+                <td class="py-3 px-4 font-sans font-semibold text-slate-900">{{ r.name }}</td>
+                <td class="py-3 px-4 text-slate-600">{{ r.category }}</td>
+                <td class="py-3 px-4 text-slate-800 break-all">{{ r.payload }}</td>
+                <td class="py-3 px-4">{{ r.http_status }}</td>
+                <td class="py-3 px-4">
+                    <span class="px-2.5 py-1 rounded text-[11px] font-bold
+                        {{ 'bg-rose-100 text-rose-800 border border-rose-300' if r.badge == 'red' else
+                           ('bg-emerald-100 text-emerald-800 border border-emerald-300' if r.badge == 'emerald' else
+                            'bg-blue-100 text-blue-800 border border-blue-300') }}">
+                        {{ r.outcome }}
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}

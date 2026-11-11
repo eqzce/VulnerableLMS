@@ -1,4 +1,4 @@
-# UniMoodle — Web Security Laboratory
+# VulnerableLMS — Web Security Laboratory
 
 Учебная веб-лаборатория по веб-безопасности и тестированию Web Application Firewall (WAF), выполненная в виде университетского портала с журналом оценок, форумом курса и административным разделом.
 

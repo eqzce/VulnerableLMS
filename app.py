@@ -28,7 +28,7 @@ from flask import (
 )
 
 app = Flask(__name__)
-app.secret_key = "moodle-uni-portal-coraza-waf-key"
+app.secret_key = "vulnerable-lms-coraza-waf-key"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "security_lab.db")
@@ -1616,7 +1616,7 @@ def admin_secret_keys():
         "service": "University Intranet Exam Key Server",
         "flag": "FLAG{SSRF_INTRANET_PIVOT_MASTERED}",
         "internal_api_token": "uni-prod-jwt-secret-9941a8-faculty",
-        "aws_metadata_mock": "arn:aws:iam::123456789012:role/UniMoodleRegistrarRole",
+        "aws_metadata_mock": "arn:aws:iam::123456789012:role/VulnerableLMSRegistrarRole",
     }
 
 
@@ -1698,7 +1698,7 @@ def ssrf_lab():
 
                 req = urllib.request.Request(
                     fetch_url,
-                    headers={"User-Agent": "UniMoodle-Resource-Fetcher/2.0"},
+                    headers={"User-Agent": "VulnerableLMS-Resource-Fetcher/2.0"},
                 )
                 with urllib.request.urlopen(req, timeout=4) as resp:
                     http_status = resp.status
@@ -2337,7 +2337,7 @@ if __name__ == "__main__":
     start_coraza_reverse_proxy()
     print("=======================================================================")
     print("  OWASP Coraza WAF (Caddy Reverse Proxy) : http://127.0.0.1:5001")
-    print("  UniMoodle Internal Flask Upstream      : http://127.0.0.1:5002")
+    print("  VulnerableLMS Internal Flask Upstream  : http://127.0.0.1:5002")
     print("  --> OPEN IN BROWSER / BURP SUITE       : http://127.0.0.1:5001")
     print("=======================================================================")
     app.run(host="127.0.0.1", port=INTERNAL_FLASK_PORT, debug=False)

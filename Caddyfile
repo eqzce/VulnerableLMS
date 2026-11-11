@@ -7,8 +7,8 @@
 :5001 {
     coraza_waf {
         directives `
-            # Revision: 1794414576.991511
-            Include c:/Users/Ersultan/Desktop/WebSec/moodle_portal/coraza_rules.conf
+            # Revision: 1794417007.351923
+            Include ./coraza_rules.conf
         `
     }
     reverse_proxy 127.0.0.1:5002

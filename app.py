@@ -784,9 +784,6 @@ def write_coraza_config_files():
     else:
         engine_state = "On"
 
-    audit_path_posix = CORAZA_AUDIT_LOG.replace("\\", "/")
-    rules_path_posix = CORAZA_RULES_PATH.replace("\\", "/")
-
     secrules_lines = [
         "# ======================================================================",
         "# OWASP CORAZA WAF — MODSECURITY SECLANG CONFIGURATION (AUTO-GENERATED)",
@@ -798,7 +795,7 @@ def write_coraza_config_files():
         "SecAuditLogParts ABIJDEFHZ",
         "SecAuditLogType Serial",
         "SecAuditLogFormat JSON",
-        f"SecAuditLog {audit_path_posix}",
+        "SecAuditLog ./coraza_audit.log",
         "",
         "# Whitelist WAF Admin Dashboard, Hints & Settings endpoints",
         'SecRule REQUEST_URI "@rx ^/(waf-dashboard|waf/|settings/|hints|coraza-blocked)" "id:999,phase:1,pass,nolog,ctl:ruleEngine=Off"',
@@ -838,7 +835,7 @@ def write_coraza_config_files():
     coraza_waf {{
         directives `
             # Revision: {rev_stamp}
-            Include {rules_path_posix}
+            Include ./coraza_rules.conf
         `
     }}
     reverse_proxy 127.0.0.1:{INTERNAL_FLASK_PORT}
@@ -1516,7 +1513,17 @@ def rce_lab():
 
         if command_output and any(
             k in command_output.lower()
-            for k in ["ersultan", "desktop", "nt authority", "user", "whoami", "windows\\system32"]
+            for k in [
+                os.environ.get("USERNAME", "").lower(),
+                os.environ.get("USER", "").lower(),
+                "desktop",
+                "nt authority",
+                "user",
+                "whoami",
+                "windows\\system32",
+                "\\",
+            ]
+            if k
         ):
             if any(sep in executed_cmd for sep in ["&", "|", ";"]):
                 rce_flag = "FLAG{RCE_COMMAND_INJECTION_PWNED}"

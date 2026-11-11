@@ -1,0 +1,12 @@
+CS-404: Web Application Security — Official Course Syllabus
+Academic Year: 2025/2026 | Instructor: Prof. R. Vance
+
+Week 1: HTTP Protocols, Web Architecture & OWASP Top 10
+Week 2: SQL Injection & Advanced Evasion Techniques
+Week 3: Cross-Site Scripting (Reflected, Stored, DOM)
+Week 4: Broken Access Control & Privilege Escalation
+Week 5: Command Injection & OS Interaction
+Week 6: File Inclusion & Path Traversal (LFI/RFI)
+Week 7: Server-Side Request Forgery (SSRF)
+Week 8: Insecure Direct Object References (IDOR) & CSRF Attacks
+Final Project: Web Application Firewall (WAF) Deployment & Evasion

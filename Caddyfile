@@ -7,7 +7,7 @@
 :5001 {
     coraza_waf {
         directives `
-            # Revision: 1794056717.573904
+            # Revision: 1794414576.991511
             Include c:/Users/Ersultan/Desktop/WebSec/moodle_portal/coraza_rules.conf
         `
     }

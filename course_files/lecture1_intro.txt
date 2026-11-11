@@ -1,0 +1,6 @@
+CS-404: Lecture 1 Notes — Introduction to Security Controls
+============================================================
+1. Defense in Depth: Never rely on single-point filtering.
+2. Input Sanitization vs Output Encoding: Escaping must be contextual.
+3. WAF Role: Web Application Firewalls act as a reverse proxy inspecting HTTP traffic.
+4. Paranoia Levels: Balance between False Positives and Security Depth.

@@ -44,24 +44,6 @@
             <button type="submit" class="w-full py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition shadow-sm">
                 Submit Normal Student Request (is_admin=false)
             </button>
-
-            <div class="pt-3 border-t border-slate-200 space-y-2">
-                <div class="text-[11px] font-semibold uppercase text-slate-500">⚡ Simulate Burp Suite Tampering (1-Click Attack):</div>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    <button type="submit" name="sim_exploit" value="low" class="py-2 px-2.5 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-800 font-mono text-[11px] font-semibold transition">
-                        1. Low (is_admin=true)
-                    </button>
-                    <button type="submit" name="sim_exploit" value="medium" class="py-2 px-2.5 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 font-mono text-[11px] font-semibold transition">
-                        2. Med (Base64+XFF)
-                    </button>
-                    <button type="submit" name="sim_exploit" value="high" class="py-2 px-2.5 rounded-lg bg-purple-50 hover:bg-purple-100 border border-purple-300 text-purple-900 font-mono text-[11px] font-semibold transition">
-                        3. High (SHA256+URL)
-                    </button>
-                    <button type="submit" name="sim_exploit" value="bypass" class="py-2 px-2.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 font-mono text-[11px] font-semibold transition">
-                        4. WAF Bypass (L1)
-                    </button>
-                </div>
-            </div>
         </form>
     </div>
 
@@ -89,7 +71,7 @@
         {% endif %}
 
         <div class="text-[11px] text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-200">
-            Need help testing this module? Open <a href="{{ url_for('hints_page') }}" class="text-blue-600 font-semibold underline">💡 Hints & Payloads</a> in the top bar for Burp Suite instructions and one-click simulator buttons.
+            Need help testing this module? Open <a href="{{ url_for('hints_page') }}" class="text-blue-600 font-semibold underline">💡 Hints, Explanations & Payloads</a> in the top bar for Burp Suite instructions and one-click simulator buttons.
         </div>
     </div>
 </div>

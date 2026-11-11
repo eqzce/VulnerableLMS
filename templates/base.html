@@ -52,13 +52,10 @@
                 </div>
             </form>
 
-            <!-- Dedicated Hints, Scanner & Coraza WAF Links -->
+            <!-- Dedicated Hints & Coraza WAF Links -->
             <div class="flex items-center gap-2">
                 <a href="{{ url_for('hints_page') }}" class="px-2.5 py-1 rounded-md font-medium transition {{ 'bg-amber-500 text-slate-950 font-semibold' if request.path == '/hints' else 'bg-slate-800 hover:bg-slate-700 text-amber-300' }}">
-                    💡 Hints & Payloads
-                </a>
-                <a href="{{ url_for('auto_scanner') }}" class="px-2.5 py-1 rounded-md font-medium transition {{ 'bg-blue-600 text-white font-semibold' if request.path == '/scanner' else 'bg-slate-800 hover:bg-slate-700 text-blue-300' }}">
-                    ⚡ Auto-Scanner
+                    💡 Hints, Explanations & Payloads
                 </a>
                 <a href="{{ url_for('waf_dashboard') }}" class="px-2.5 py-1 rounded-md font-medium transition {{ 'bg-emerald-600 text-white font-semibold' if request.path == '/waf-dashboard' else 'bg-slate-800 hover:bg-slate-700 text-emerald-300' }}">
                     🛡️ Coraza WAF ({{ waf_stats.total }})
@@ -80,18 +77,38 @@
                 </div>
             </a>
 
-            <nav class="flex items-center gap-1.5 text-sm font-medium">
+            <nav class="flex flex-wrap items-center gap-1.5 text-xs font-medium">
                 <a href="{{ url_for('sqli_lab') }}"
-                   class="px-3.5 py-2 rounded-lg transition {{ 'bg-blue-50 text-blue-700 font-semibold border border-blue-200' if request.path == '/sqli' else 'text-slate-600 hover:bg-slate-100' }}">
-                    📊 Gradebook
+                   class="px-2.5 py-1.5 rounded-lg transition {{ 'bg-blue-50 text-blue-700 font-semibold border border-blue-200' if request.path == '/sqli' else 'text-slate-600 hover:bg-slate-100' }}">
+                    📊 1. SQLi
                 </a>
                 <a href="{{ url_for('xss_lab') }}"
-                   class="px-3.5 py-2 rounded-lg transition {{ 'bg-blue-50 text-blue-700 font-semibold border border-blue-200' if request.path == '/xss' else 'text-slate-600 hover:bg-slate-100' }}">
-                    💬 Course Forum
+                   class="px-2.5 py-1.5 rounded-lg transition {{ 'bg-blue-50 text-blue-700 font-semibold border border-blue-200' if request.path == '/xss' else 'text-slate-600 hover:bg-slate-100' }}">
+                    💬 2. XSS
                 </a>
                 <a href="{{ url_for('vault_lab') }}"
-                   class="px-3.5 py-2 rounded-lg transition {{ 'bg-blue-50 text-blue-700 font-semibold border border-blue-200' if request.path == '/vault' else 'text-slate-600 hover:bg-slate-100' }}">
-                    🏛️ Dean's Office
+                   class="px-2.5 py-1.5 rounded-lg transition {{ 'bg-blue-50 text-blue-700 font-semibold border border-blue-200' if request.path == '/vault' else 'text-slate-600 hover:bg-slate-100' }}">
+                    🏛️ 3. Vault (Burp)
+                </a>
+                <a href="{{ url_for('rce_lab') }}"
+                   class="px-2.5 py-1.5 rounded-lg transition {{ 'bg-blue-50 text-blue-700 font-semibold border border-blue-200' if request.path == '/rce' else 'text-slate-600 hover:bg-slate-100' }}">
+                    💻 4. RCE
+                </a>
+                <a href="{{ url_for('lfi_lab') }}"
+                   class="px-2.5 py-1.5 rounded-lg transition {{ 'bg-blue-50 text-blue-700 font-semibold border border-blue-200' if request.path == '/lfi' else 'text-slate-600 hover:bg-slate-100' }}">
+                    📄 5. LFI
+                </a>
+                <a href="{{ url_for('ssrf_lab') }}"
+                   class="px-2.5 py-1.5 rounded-lg transition {{ 'bg-blue-50 text-blue-700 font-semibold border border-blue-200' if request.path == '/ssrf' else 'text-slate-600 hover:bg-slate-100' }}">
+                    🌐 6. SSRF
+                </a>
+                <a href="{{ url_for('forced_browsing_lab', subpath='student-dashboard') }}"
+                   class="px-2.5 py-1.5 rounded-lg transition {{ 'bg-blue-50 text-blue-700 font-semibold border border-blue-200' if request.path.startswith('/portal') or request.path == '/forced-browsing' else 'text-slate-600 hover:bg-slate-100' }}">
+                    🧭 7. Forced Browsing
+                </a>
+                <a href="{{ url_for('csrf_lab') }}"
+                   class="px-2.5 py-1.5 rounded-lg transition {{ 'bg-blue-50 text-blue-700 font-semibold border border-blue-200' if request.path == '/csrf' else 'text-slate-600 hover:bg-slate-100' }}">
+                    ✉️ 8. CSRF
                 </a>
             </nav>
 

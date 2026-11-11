@@ -2,9 +2,12 @@ import atexit
 import base64
 import hashlib
 import html
+import ipaddress
 import json
 import os
+import posixpath
 import re
+import socket
 import sqlite3
 import subprocess
 import time
@@ -20,6 +23,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    session,
     url_for,
 )
 
@@ -171,6 +175,84 @@ def init_db():
                 "Welcome to CS-404! Post your questions about the midterm project or lab assignments below.",
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             ),
+        )
+
+    # Table for Module 7: IDOR (Student Academic Dossiers)
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS students (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id TEXT NOT NULL,
+            full_name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            gpa TEXT NOT NULL,
+            disciplinary TEXT NOT NULL,
+            scholarship TEXT NOT NULL,
+            medical TEXT NOT NULL
+        )
+        """
+    )
+    c.execute("SELECT COUNT(*) FROM students")
+    if c.fetchone()[0] == 0:
+        seed_students = [
+            (
+                "1",
+                "Dean Vance (Provost & Department Chair)",
+                "vance@campus.unimoodle.edu",
+                "4.00 (Summa Cum Laude)",
+                "CLASSIFIED DOSSIER | FLAG{IDOR_DIRECT_OBJECT_REF_MASTERED}",
+                "Full Presidential Fellowship ($50,000 / year)",
+                "Restricted - Executive Faculty Medical Record",
+            ),
+            (
+                "2",
+                "Alice Mercer",
+                "alice.mercer@campus.unimoodle.edu",
+                "3.92 (Honors)",
+                "Clean record - Peer Tutor for CS-404 Web Security",
+                "Dean's Merit Scholarship ($12,000 / year)",
+                "No health restrictions on file",
+            ),
+            (
+                "3",
+                "Bob Kowalski",
+                "bob.kowalski@campus.unimoodle.edu",
+                "2.85",
+                "Academic Warning (Fall 2025: Unsanitized Queries)",
+                "Partial Need-based Aid ($4,000 / year)",
+                "Annual routine physical cleared",
+            ),
+            (
+                "4",
+                "Charlie Kim",
+                "charlie.kim@campus.unimoodle.edu",
+                "3.60",
+                "Good conduct standing",
+                "Athletic Excellence Grant ($8,000 / year)",
+                "Varsity sports medical clearance active",
+            ),
+        ]
+        c.executemany(
+            "INSERT INTO students (student_id, full_name, email, gpa, disciplinary, scholarship, medical) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            seed_students,
+        )
+
+    # Table for Module 8: CSRF (Student Account Profiles)
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_profiles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            email TEXT NOT NULL,
+            role TEXT NOT NULL
+        )
+        """
+    )
+    c.execute("SELECT COUNT(*) FROM user_profiles")
+    if c.fetchone()[0] == 0:
+        c.execute(
+            "INSERT INTO user_profiles (username, email, role) VALUES (?, ?, ?)",
+            ("guest_student", "student_guest@campus.unimoodle.edu", "Student"),
         )
 
     # Check if waf_rules has secrule_id column; recreate table if upgrading schema
@@ -422,7 +504,7 @@ def init_db():
             "LFI / Path Traversal",
             1,
             "ARGS|REQUEST_URI",
-            r"(?i)(\.\./|\.\.\\|/etc/passwd|/etc/shadow|c:\\windows|c:/windows|boot\.ini|win\.ini)",
+            r"(?i)(\.\./|\.\.\\|/etc/passwd|/etc/shadow|c:\\windows|c:/windows|boot\.ini|win\.ini|secret_exam_key)",
             "OWASP CRS 930: Blocks directory traversal attempts accessing system configuration or SAM files.",
             "CRITICAL",
             1,
@@ -436,6 +518,28 @@ def init_db():
             r"(?i)(%00|\\x00|%2500)",
             "OWASP CRS 930: Blocks null byte poison injection used to bypass file extension filters.",
             "HIGH",
+            1,
+        ),
+        (
+            930120,
+            "WAF-LFI-SENSITIVE-FILES",
+            "LFI / Path Traversal",
+            1,
+            "ARGS:doc|REQUEST_URI",
+            r"(?i)(secret_exam_key|credentials|\.env|\.git)",
+            "OWASP CRS 930120: Access to restricted sensitive examination keys, configuration files, and secrets.",
+            "CRITICAL",
+            1,
+        ),
+        (
+            293010,
+            "WAF-LFI-BYPASS",
+            "LFI / Path Traversal",
+            2,
+            "ARGS:doc|REQUEST_URI",
+            r"(?i)(\.\.|%2e%2e|%2f|%5c|\.\.//|\.\.\\\\)",
+            "OWASP CRS 930 (L2): Deep inspection of encoded traversal (%2f, %5c) and nested sequences (....//).",
+            "CRITICAL",
             1,
         ),
         (
@@ -554,6 +658,91 @@ def init_db():
             r"(?i)\b(phpinfo|xdebug|actuator/(health|env)|dump_env|trace\.axd|elmah\.axd)\b",
             "OWASP CRS 950: Blocks access to framework debug probes, metrics actuators, and stack traces.",
             "MEDIUM",
+            1,
+        ),
+
+        # --- SECTION 934: SERVER-SIDE REQUEST FORGERY (SSRF) ---
+        (
+            934100,
+            "WAF-SSRF-LOOPBACK",
+            "SSRF",
+            1,
+            "ARGS:url|ARGS:target|REQUEST_URI",
+            r"(?i)(127\.0\.0\.1|localhost|0\.0\.0\.0|169\.254\.169\.254|metadata\.google\.internal)",
+            "OWASP CRS 934: Blocks Server-Side Request Forgery targeting loopback and cloud metadata.",
+            "CRITICAL",
+            1,
+        ),
+        (
+            2034,
+            "WAF-SSRF-BYPASS",
+            "SSRF",
+            2,
+            "ARGS:url|ARGS:target|REQUEST_URI",
+            r"(?i)(2130706433|0x7f000001|\[::1\]|0177\.0\.0\.1|::1)",
+            "OWASP CRS 934 (L2): Deep inspection of alternative numeric, hex, and IPv6 loopback encodings.",
+            "CRITICAL",
+            1,
+        ),
+
+        # --- SECTION 943: INSECURE DIRECT OBJECT REFERENCES (IDOR / BOLA) ---
+        (
+            943200,
+            "WAF-IDOR-NUMERIC-OBJECT",
+            "IDOR",
+            1,
+            "ARGS:student_id|REQUEST_URI",
+            r"(?i)(\bstudent_id=1\b|^1$)",
+            "OWASP CRS 943: Direct Object Reference (IDOR) - unauthorized access attempt to Provost/Dean master record #1.",
+            "CRITICAL",
+            1,
+        ),
+        (
+            2043,
+            "WAF-IDOR-BYPASS",
+            "IDOR",
+            2,
+            "ARGS:student_id|REQUEST_URI",
+            r"(?i)(MQ==|MQ%3D%3D|MQ%3d%3d|c4ca4238a0b923820dcc509a6f75849b|\bstudent_id=01\b|^01$)",
+            "OWASP CRS 943 (L2): Deep inspection of encoded Base64 (MQ==), MD5 hashed or zero-padded direct object references.",
+            "CRITICAL",
+            1,
+        ),
+
+        # --- SECTION 930: FORCED BROWSING & UNRESTRICTED URL ACCESS ---
+        (
+            930130,
+            "WAF-FORCED-BROWSING-ADMIN",
+            "Forced Browsing / URL Access",
+            1,
+            "REQUEST_URI",
+            r"(?i)(/admin-console|/secret-backup|/admin_panel|/faculty-console)",
+            "OWASP CRS 930: Blocks forced browsing and direct URL access to restricted administrative consoles and faculty endpoints.",
+            "CRITICAL",
+            1,
+        ),
+        (
+            293013,
+            "WAF-URL-PATH-TRAVERSAL-BYPASS",
+            "Forced Browsing / URL Access",
+            2,
+            "REQUEST_URI",
+            r"(?i)(%2e%2e|/\.\./|/public/\.\./|/faculty/\.\./|admin-console;|admin-console%00|%61dmin-console)",
+            "OWASP CRS 930 (L2): Deep inspection of URL path traversal and dot-segment evasion (/../, %2e%2e, matrix semicolons) targeting administrative consoles.",
+            "CRITICAL",
+            1,
+        ),
+
+        # --- SECTION 949: CROSS-SITE REQUEST FORGERY (CSRF) ---
+        (
+            949100,
+            "WAF-CSRF-ANOMALOUS-ORIGIN",
+            "CSRF",
+            2,
+            "REQUEST_HEADERS:Referer|ARGS:email",
+            r"(?i)(attacker\.com|evil\.com)",
+            "OWASP CRS 949 (L2): Detects anomalous cross-origin referrers and known attacker domains in state-changing parameters.",
+            "HIGH",
             1,
         ),
     ]
@@ -874,6 +1063,8 @@ def coraza_detect_banner_notifier():
             ]
         else:
             candidates = [args_str]
+            if "REQUEST_URI" in target:
+                candidates.extend([request.full_path, request.path, request.environ.get("REQUEST_URI", "")])
 
         try:
             if any(c and re.search(pat, c) for c in candidates):
@@ -957,6 +1148,10 @@ def update_settings():
         db.execute(
             "UPDATE settings SET value = ? WHERE key = 'difficulty'", (difficulty,)
         )
+        db.execute(
+            "UPDATE user_profiles SET email = 'student_guest@campus.unimoodle.edu' WHERE username = 'guest_student'"
+        )
+        session.pop("csrf_error", None)
     if waf_mode in ("off", "detect", "block"):
         db.execute("UPDATE settings SET value = ? WHERE key = 'waf_mode'", (waf_mode,))
     if waf_paranoia in ("1", "2"):
@@ -1249,6 +1444,550 @@ def vault_lab():
 
 
 # ==============================================================================
+# MODULE 4: CAMPUS SERVER DIAGNOSTIC (COMMAND INJECTION / RCE)
+# ==============================================================================
+@app.route("/rce", methods=["GET", "POST"])
+def rce_lab():
+    settings = get_settings()
+    difficulty = settings["difficulty"]
+    target_input = "127.0.0.1"
+    command_executed = False
+    executed_cmd = ""
+    command_output = ""
+    rce_flag = None
+
+    if request.method == "POST":
+        sim_payload = request.form.get("sim_payload", "")
+        if sim_payload == "low":
+            target_input = "127.0.0.1 && whoami"
+        elif sim_payload == "medium":
+            target_input = "127.0.0.1 | whoami"
+        elif sim_payload == "high":
+            target_input = "127.0.0.1&whoami"
+        elif sim_payload == "bypass":
+            target_input = "127.0.0.1&w'h'o'a'm'i"
+        else:
+            target_input = request.form.get("target", "127.0.0.1").strip()
+
+        sanitized_target = target_input
+        can_execute = True
+
+        if difficulty == "low":
+            executed_cmd = f"ping -n 1 {sanitized_target}"
+        elif difficulty == "medium":
+            # Blacklist && and ;
+            sanitized_target = sanitized_target.replace("&&", "").replace(";", "")
+            executed_cmd = f"ping -n 1 {sanitized_target}"
+        elif difficulty == "high":
+            # Blacklist &&, ;, |, and spaces, but allow single & without space
+            sanitized_target = sanitized_target.replace("&&", "").replace(";", "").replace("|", "")
+            sanitized_target = re.sub(r"\s+", "", sanitized_target)
+            executed_cmd = f"ping -n 1 {sanitized_target}"
+        else:
+            # Impossible: Validate strictly as IP address
+            try:
+                ipaddress.ip_address(sanitized_target)
+                executed_cmd = f"ping -n 1 {sanitized_target}"
+            except ValueError:
+                can_execute = False
+                command_executed = True
+                executed_cmd = f"ping -n 1 {sanitized_target} [BLOCKED BY IP WHITELIST]"
+                command_output = "SECURITY ERROR: Parameter failed strict RFC 791 IPv4 / RFC 8200 IPv6 address validation. Subprocess invocation cancelled."
+
+        if can_execute:
+            command_executed = True
+            # Compatibility translation for cmd.exe if quotes evasion was used
+            shell_cmd = executed_cmd
+            if "w'h'o'a'm'i" in shell_cmd:
+                shell_cmd = shell_cmd.replace("w'h'o'a'm'i", "whoami")
+            try:
+                proc = subprocess.run(
+                    shell_cmd,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                command_output = proc.stdout + proc.stderr
+            except subprocess.TimeoutExpired:
+                command_output = "Command timed out after 5 seconds."
+            except Exception as e:
+                command_output = f"Execution error: {str(e)}"
+
+        if command_output and any(
+            k in command_output.lower()
+            for k in ["ersultan", "desktop", "nt authority", "user", "whoami", "windows\\system32"]
+        ):
+            if any(sep in executed_cmd for sep in ["&", "|", ";"]):
+                rce_flag = "FLAG{RCE_COMMAND_INJECTION_PWNED}"
+
+    return render_template(
+        "rce.html",
+        target_input=target_input,
+        command_executed=command_executed,
+        executed_cmd=executed_cmd,
+        command_output=command_output,
+        rce_flag=rce_flag,
+    )
+
+
+# ==============================================================================
+# MODULE 5: COURSE DOCUMENTS READER (PATH TRAVERSAL / LFI)
+# ==============================================================================
+@app.route("/lfi", methods=["GET"])
+def lfi_lab():
+    settings = get_settings()
+    difficulty = settings["difficulty"]
+    doc_param = request.args.get("doc", "syllabus_cs404.txt")
+    file_content = None
+    error_msg = None
+    lfi_flag = None
+
+    course_files_dir = os.path.join(BASE_DIR, "course_files")
+
+    if doc_param:
+        target_path = ""
+        is_safe = True
+
+        if difficulty == "low":
+            target_path = os.path.join(course_files_dir, doc_param)
+        elif difficulty == "medium":
+            # Non-recursive strip of ../ and ..\
+            cleaned_doc = doc_param.replace("../", "").replace("..\\", "")
+            target_path = os.path.join(course_files_dir, cleaned_doc)
+        elif difficulty == "high":
+            # Requires filename to start with syllabus_
+            if not doc_param.startswith("syllabus_"):
+                is_safe = False
+                error_msg = "Access Denied: High security policy requires document names to start with 'syllabus_'."
+            else:
+                target_path = os.path.join(course_files_dir, doc_param)
+        else:
+            # Impossible: Whitelist check
+            allowed_docs = {"syllabus_cs404.txt", "lecture1_intro.txt"}
+            if doc_param not in allowed_docs:
+                is_safe = False
+                error_msg = "Access Denied (Patched): Only verified white-listed course documents may be opened."
+            else:
+                target_path = os.path.join(course_files_dir, doc_param)
+
+        if is_safe and target_path:
+            try:
+                target_path = os.path.normpath(target_path)
+                if not (os.path.exists(target_path) and os.path.isfile(target_path)):
+                    base_name = os.path.basename(target_path)
+                    candidates = [
+                        os.path.join(course_files_dir, base_name),
+                        os.path.join(BASE_DIR, base_name),
+                        os.path.join(BASE_DIR, "course_files", base_name),
+                        os.path.join(os.path.dirname(BASE_DIR), "course_files", base_name),
+                    ]
+                    for cand in candidates:
+                        if os.path.exists(cand) and os.path.isfile(cand):
+                            target_path = cand
+                            break
+                if os.path.exists(target_path) and os.path.isfile(target_path):
+                    with open(target_path, "r", encoding="utf-8", errors="ignore") as f:
+                        file_content = f.read()
+                    if "FLAG{LFI_PATH_TRAVERSAL_MASTERED}" in file_content or "secret_exam_key.txt" in target_path.lower():
+                        lfi_flag = "FLAG{LFI_PATH_TRAVERSAL_MASTERED}"
+                else:
+                    error_msg = f"File not found: {target_path}"
+            except Exception as e:
+                error_msg = f"File reading error: {str(e)}"
+
+    return render_template(
+        "lfi.html",
+        doc_param=doc_param,
+        file_content=file_content,
+        error_msg=error_msg,
+        lfi_flag=lfi_flag,
+    )
+
+
+# ==============================================================================
+# MODULE 6: LEARNING RESOURCE IMPORTER (SSRF)
+# ==============================================================================
+@app.route("/admin/secret-keys", methods=["GET"])
+def admin_secret_keys():
+    """Confidential internal university microservice, intended for loopback access only."""
+    return {
+        "status": "CONFIDENTIAL_ADMIN_KEYS",
+        "service": "University Intranet Exam Key Server",
+        "flag": "FLAG{SSRF_INTRANET_PIVOT_MASTERED}",
+        "internal_api_token": "uni-prod-jwt-secret-9941a8-faculty",
+        "aws_metadata_mock": "arn:aws:iam::123456789012:role/UniMoodleRegistrarRole",
+    }
+
+
+@app.route("/ssrf", methods=["GET", "POST"])
+def ssrf_lab():
+    settings = get_settings()
+    difficulty = settings["difficulty"]
+    target_url = ""
+    http_status = None
+    fetched_body = None
+    error_msg = None
+    ssrf_flag = None
+
+    if request.method in ("POST", "GET") and (request.form.get("url") or request.args.get("url")):
+        target_url = (request.form.get("url") or request.args.get("url", "")).strip()
+
+        is_allowed = True
+        lowered_url = target_url.lower()
+
+        if difficulty == "low":
+            pass
+        elif difficulty == "medium":
+            # Blacklist literal 127.0.0.1 and localhost
+            if "127.0.0.1" in lowered_url or "localhost" in lowered_url:
+                is_allowed = False
+                error_msg = "Blocked by Medium Firewall: Direct '127.0.0.1' and 'localhost' references are prohibited."
+        elif difficulty == "high":
+            # Blacklist 127., localhost, 0.0.0.0, and decimal 2130706433
+            if any(k in lowered_url for k in ["127.", "localhost", "0.0.0.0", "2130706433"]):
+                is_allowed = False
+                error_msg = "Blocked by High Firewall: Loopback IPs and decimal encodings (2130706433) are prohibited."
+        else:
+            # Impossible: DNS resolution + check private/loopback RFC ranges
+            try:
+                parsed = urllib.parse.urlparse(target_url)
+                if parsed.scheme not in ("http", "https"):
+                    is_allowed = False
+                    error_msg = "Security Error: Only http/https protocols permitted."
+                else:
+                    host = parsed.hostname
+                    resolved_ip = socket.gethostbyname(host)
+                    ip_obj = ipaddress.ip_address(resolved_ip)
+                    if ip_obj.is_loopback or ip_obj.is_private or ip_obj.is_reserved or ip_obj.is_link_local:
+                        is_allowed = False
+                        error_msg = f"Security Error: Destination IP {resolved_ip} is an internal/loopback network address."
+            except Exception as e:
+                is_allowed = False
+                error_msg = f"DNS Validation Error: {str(e)}"
+
+        if is_allowed:
+            try:
+                fetch_url = target_url
+                parsed = urllib.parse.urlparse(fetch_url)
+                host = parsed.hostname
+                port = parsed.port or (443 if parsed.scheme == "https" else 80)
+                if host:
+                    norm_ip = None
+                    if host.isdigit():
+                        try:
+                            norm_ip = str(ipaddress.IPv4Address(int(host)))
+                        except Exception:
+                            pass
+                    elif host.lower().startswith("0x"):
+                        try:
+                            norm_ip = str(ipaddress.IPv4Address(int(host, 16)))
+                        except Exception:
+                            pass
+                    elif host in ("::1", "[::1]"):
+                        norm_ip = "127.0.0.1"
+                    elif host.startswith("0") and "." in host:
+                        try:
+                            parts = host.split(".")
+                            norm_ip = ".".join(str(int(p, 8)) for p in parts)
+                        except Exception:
+                            pass
+                    if norm_ip:
+                        netloc = f"{norm_ip}:{port}" if parsed.port else norm_ip
+                        fetch_url = urllib.parse.urlunparse(parsed._replace(netloc=netloc))
+
+                req = urllib.request.Request(
+                    fetch_url,
+                    headers={"User-Agent": "UniMoodle-Resource-Fetcher/2.0"},
+                )
+                with urllib.request.urlopen(req, timeout=4) as resp:
+                    http_status = resp.status
+                    fetched_body = resp.read().decode("utf-8", errors="ignore")
+                    if "FLAG{SSRF_INTRANET_PIVOT_MASTERED}" in fetched_body:
+                        ssrf_flag = "FLAG{SSRF_INTRANET_PIVOT_MASTERED}"
+            except urllib.error.HTTPError as e:
+                http_status = e.code
+                fetched_body = e.read().decode("utf-8", errors="ignore")
+            except Exception as e:
+                error_msg = f"Network connection error: {str(e)}"
+
+    return render_template(
+        "ssrf.html",
+        target_url=target_url,
+        http_status=http_status,
+        fetched_body=fetched_body,
+        error_msg=error_msg,
+        ssrf_flag=ssrf_flag,
+    )
+
+
+# ==============================================================================
+# MODULE 7: CAMPUS GOVERNANCE & PRIVILEGED CONSOLES (FORCED BROWSING / URL ACCESS)
+# ==============================================================================
+@app.route("/forced-browsing")
+def forced_browsing_redirect():
+    return redirect(url_for("forced_browsing_lab", subpath="student-dashboard"))
+
+
+@app.route("/portal", defaults={"subpath": "student-dashboard"}, methods=["GET"])
+@app.route("/portal/<path:subpath>", methods=["GET"])
+def forced_browsing_lab(subpath="student-dashboard"):
+    settings = get_settings()
+    difficulty = settings["difficulty"]
+
+    # Gather all variations of the requested path
+    raw_uri = request.environ.get("REQUEST_URI", request.path)
+    if "/portal/" in raw_uri:
+        uri_sub = raw_uri.split("/portal/", 1)[1].split("?")[0]
+    else:
+        uri_sub = subpath
+
+    unquoted_sub = urllib.parse.unquote(uri_sub)
+    norm_sub = posixpath.normpath(unquoted_sub).lstrip("/")
+
+    # Check if target resolves to the Dean's admin console or backup
+    resolves_to_admin = (
+        norm_sub in ("admin-console", "admin_panel", "faculty-console") or
+        norm_sub.endswith("/admin-console") or
+        "admin-console" in unquoted_sub.lower() or
+        "admin-console" in uri_sub.lower()
+    )
+    resolves_to_backup = (
+        norm_sub in ("secret-backup", "backup") or
+        "secret-backup" in unquoted_sub.lower()
+    )
+
+    is_accessible = False
+    is_admin_console = False
+    is_backup = False
+    error_msg = None
+    fb_flag = None
+
+    if resolves_to_admin or resolves_to_backup:
+        if difficulty == "low":
+            # Low: Completely vulnerable to direct URL manipulation in browser address bar
+            is_accessible = True
+            if resolves_to_admin:
+                is_admin_console = True
+                fb_flag = "FLAG{FORCED_BROWSING_URL_MASTERED}"
+            else:
+                is_backup = True
+                fb_flag = "FLAG{FORCED_BROWSING_URL_MASTERED}"
+        elif difficulty == "medium":
+            # Medium: Blacklists literal 'admin-console' in URL path (case-sensitive)
+            is_direct = uri_sub.rstrip("/") == "admin-console"
+            if is_direct:
+                is_accessible = False
+                error_msg = "Blocked by Medium Filter: Direct access to '/admin-console' is blacklisted. Bypass by manipulating the URL with URL-encoding (/portal/%61dmin-console), case manipulation (/portal/ADMIN-CONSOLE) or encoded traversal (/portal/public/%2e%2e/admin-console)!"
+            else:
+                is_accessible = True
+                is_admin_console = True
+                fb_flag = "FLAG{FORCED_BROWSING_URL_MASTERED}"
+        elif difficulty == "high":
+            # High: Enforces that URL path must reside inside the '/portal/faculty/' directory prefix
+            if not (uri_sub.startswith("faculty/") or unquoted_sub.startswith("faculty/")):
+                is_accessible = False
+                error_msg = "Blocked by High Filter: Portal security policy restricts access strictly to the '/portal/faculty/' namespace. Bypass by editing the URL to traverse out of faculty directory: /portal/faculty/%2e%2e/admin-console (or navigate to /portal/faculty/admin-console)!"
+            else:
+                is_accessible = True
+                is_admin_console = True
+                fb_flag = "FLAG{FORCED_BROWSING_URL_MASTERED}"
+        else:
+            # Impossible: Cryptographic Role-Based Access Control (RBAC)
+            is_accessible = False
+            error_msg = "Access Denied (Patched): Strict cryptographic Role-Based Access Control (RBAC) enforced. Only verified Dean / Provost session tokens may access administrative consoles regardless of URL."
+    else:
+        # Standard public student dashboard or course catalog
+        is_accessible = True
+
+    return render_template(
+        "forced_browsing.html",
+        current_subpath=uri_sub or "student-dashboard",
+        full_url_path=request.path,
+        is_accessible=is_accessible,
+        is_admin_console=is_admin_console,
+        is_backup=is_backup,
+        error_msg=error_msg,
+        fb_flag=fb_flag,
+    )
+
+
+# ==============================================================================
+# MODULE 7 (LEGACY / COMPAT): STUDENT DOSSIER & TRANSCRIPT RECORDS (IDOR)
+# ==============================================================================
+@app.route("/idor", methods=["GET"])
+def idor_lab():
+    settings = get_settings()
+    difficulty = settings["difficulty"]
+    param_value = request.args.get("student_id", "2").strip()
+    student = None
+    error_msg = None
+    idor_flag = None
+
+    db = get_db()
+    target_id = None
+
+    if difficulty == "low":
+        target_id = param_value
+    elif difficulty == "medium":
+        # Base64 encoded reference
+        try:
+            decoded = base64.b64decode(param_value).decode("utf-8")
+            if decoded.isdigit():
+                target_id = decoded
+            else:
+                target_id = param_value
+        except Exception:
+            target_id = param_value
+    elif difficulty == "high":
+        # MD5 hash reference
+        md5_map = {
+            "c4ca4238a0b923820dcc509a6f75849b": "1",
+            "c81e728d9d4c2f636f067f89cc14862c": "2",
+            "eccbc87e4b5ce2fe28308fd9f2a7baf3": "3",
+            "a87ff679a2f3e71d9181a67b7542122c": "4",
+        }
+        if param_value in md5_map:
+            target_id = md5_map[param_value]
+        elif param_value.isdigit():
+            target_id = str(int(param_value))
+        else:
+            error_msg = "Invalid Identifier: High security requires MD5 dossier token or padded index."
+    else:
+        # Impossible: Strict session identity binding (Alice Mercer = 2)
+        target_id = "2"
+
+    if target_id and not error_msg:
+        try:
+            row = db.execute(
+                "SELECT * FROM students WHERE student_id = ? OR id = ?",
+                (target_id, target_id),
+            ).fetchone()
+            if row:
+                student = row
+                if str(student["student_id"]) == "1" or student["id"] == 1:
+                    idor_flag = "FLAG{IDOR_DIRECT_OBJECT_REF_MASTERED}"
+            else:
+                error_msg = f"Student Record #{target_id} not found in Registrar database."
+        except Exception as e:
+            error_msg = f"Database query error: {str(e)}"
+
+    return render_template(
+        "idor.html",
+        param_value=param_value,
+        student=student,
+        error_msg=error_msg,
+        idor_flag=idor_flag,
+    )
+
+
+# ==============================================================================
+# MODULE 8: NOTIFICATION EMAIL & PROFILE SETTINGS (CSRF)
+# ==============================================================================
+@app.route("/csrf", methods=["GET"])
+def csrf_lab():
+    settings = get_settings()
+    difficulty = settings["difficulty"]
+    db = get_db()
+    user_row = db.execute("SELECT * FROM user_profiles WHERE username = 'guest_student'").fetchone()
+    current_email = user_row["email"] if user_row else "student_guest@campus.unimoodle.edu"
+
+    csrf_token_val = hashlib.sha256(b"uni-session-token-cs404-guest").hexdigest()[:32]
+    csrf_error = session.pop("csrf_error", None)
+    csrf_flag = None
+    if not csrf_error and current_email != "student_guest@campus.unimoodle.edu":
+        csrf_flag = "FLAG{CSRF_EMAIL_HIJACK_MASTERED}"
+
+    return render_template(
+        "csrf.html",
+        current_email=current_email,
+        target_email="attacker@evil.com",
+        csrf_token_val=csrf_token_val if difficulty == "impossible" else None,
+        csrf_flag=csrf_flag,
+        csrf_error=csrf_error,
+    )
+
+
+@app.route("/csrf/change-email", methods=["GET", "POST"])
+def csrf_change_email():
+    settings = get_settings()
+    difficulty = settings["difficulty"]
+    db = get_db()
+
+    new_email = ""
+    sim_csrf = request.form.get("sim_csrf", "")
+
+    if sim_csrf == "low":
+        new_email = "attacker@evil.com"
+    elif sim_csrf == "medium":
+        new_email = "attacker_referer_bypass@evil.com"
+    elif sim_csrf == "high":
+        new_email = "attacker_header_bypass@evil.com"
+    elif sim_csrf == "bypass":
+        new_email = "attacker_get_bypass@evil.com"
+    else:
+        new_email = request.form.get("email") or request.args.get("email", "")
+
+    new_email = new_email.strip()
+    is_valid = True
+    error_msg = None
+
+    if difficulty == "low":
+        pass
+    elif difficulty == "medium":
+        referer = request.headers.get("Referer", "")
+        # Reject normal direct browser submission from the /csrf page so the student is forced to forge the request in Burp Suite
+        is_direct_form = not referer or referer.endswith("/csrf") or referer.rstrip("/").endswith(":5001/csrf") or referer.rstrip("/").endswith(":5002/csrf")
+        if is_direct_form and sim_csrf != "medium":
+            is_valid = False
+            error_msg = "CSRF Failed (Medium): Direct browser form submission rejected. Use Burp Suite to forge an external cross-origin Referer containing 127.0.0.1 (e.g. Referer: http://attacker.com/?ref=127.0.0.1)!"
+        elif "127.0.0.1" not in referer and "localhost" not in referer:
+            is_valid = False
+            error_msg = "CSRF Failed (Medium): Referer header did not originate from 127.0.0.1 / localhost. Bypass by appending ?ref=127.0.0.1 in Burp Suite!"
+    elif difficulty == "high":
+        # Requires POST with custom header OR GET parameter bypass
+        if request.method == "POST":
+            hdr = request.headers.get("X-Requested-With", "")
+            if hdr.lower() != "xmlhttprequest":
+                if sim_csrf != "high":
+                    is_valid = False
+                    error_msg = "CSRF Failed (High): Missing anti-CSRF custom header 'X-Requested-With: XMLHttpRequest'."
+    else:
+        # Impossible: Strict POST method + valid CSRF token
+        if request.method != "POST":
+            is_valid = False
+            error_msg = "CSRF Failed (Patched): State-changing operations prohibited over HTTP GET."
+        else:
+            token = request.form.get("csrf_token", "")
+            expected_token = hashlib.sha256(b"uni-session-token-cs404-guest").hexdigest()[:32]
+            if token != expected_token:
+                is_valid = False
+                error_msg = "CSRF Failed (Patched): Invalid or missing cryptographic CSRF token."
+
+    if is_valid and new_email:
+        db.execute("UPDATE user_profiles SET email = ? WHERE username = 'guest_student'", (new_email,))
+        db.commit()
+        session.pop("csrf_error", None)
+        flash(f"Profile notification email updated to '{new_email}'!", "success")
+    elif error_msg:
+        session["csrf_error"] = error_msg
+
+    return redirect(url_for("csrf_lab"))
+
+
+@app.route("/csrf/reset", methods=["POST"])
+def csrf_reset():
+    db = get_db()
+    db.execute(
+        "UPDATE user_profiles SET email = 'student_guest@campus.unimoodle.edu' WHERE username = 'guest_student'"
+    )
+    db.commit()
+    session.pop("csrf_error", None)
+    flash("Email reset back to student_guest@campus.unimoodle.edu.", "info")
+    return redirect(url_for("csrf_lab"))
+
+
+# ==============================================================================
 # DEDICATED HINTS & EXPLANATIONS PAGE (/hints)
 # ==============================================================================
 @app.route("/hints", methods=["GET"])
@@ -1368,6 +2107,56 @@ def auto_scanner():
                 },
                 "payload_display": "Cookie: vault_sig=sha256('user=admin') + X-Original-URL: /admin/vault",
                 "success_marker": "FLAG{BURP_",
+            },
+            {
+                "id": "SCAN-10",
+                "name": "Command Injection (RCE): Shell Operator Chaining",
+                "category": "RCE (Command Injection)",
+                "method": "POST",
+                "path": "/rce",
+                "data": {"target": "127.0.0.1 && whoami"},
+                "payload_display": "POST /rce [target=127.0.0.1 && whoami]",
+                "success_marker": "FLAG{RCE_COMMAND_INJECTION_PWNED}",
+            },
+            {
+                "id": "SCAN-11",
+                "name": "Path Traversal (LFI): Exam Key File Leak",
+                "category": "LFI (Path Traversal)",
+                "method": "GET",
+                "path": "/lfi",
+                "query_string": {"doc": "secret_exam_key.txt"},
+                "payload_display": "GET /lfi?doc=secret_exam_key.txt",
+                "success_marker": "FLAG{LFI_PATH_TRAVERSAL_MASTERED}",
+            },
+            {
+                "id": "SCAN-12",
+                "name": "SSRF: Internal Loopback Microservice Extraction",
+                "category": "SSRF",
+                "method": "POST",
+                "path": "/ssrf",
+                "data": {"url": "http://127.0.0.1:5002/admin/secret-keys"},
+                "payload_display": "POST /ssrf [url=http://127.0.0.1:5002/admin/secret-keys]",
+                "success_marker": "FLAG{SSRF_INTRANET_PIVOT_MASTERED}",
+            },
+            {
+                "id": "SCAN-13",
+                "name": "IDOR: Faculty Dean Classified Dossier Access",
+                "category": "IDOR",
+                "method": "GET",
+                "path": "/idor",
+                "query_string": {"student_id": "1"},
+                "payload_display": "GET /idor?student_id=1",
+                "success_marker": "FLAG{IDOR_DIRECT_OBJECT_REF_MASTERED}",
+            },
+            {
+                "id": "SCAN-14",
+                "name": "CSRF: Cross-Site Profile Email Hijack",
+                "category": "CSRF",
+                "method": "POST",
+                "path": "/csrf/change-email",
+                "data": {"email": "attacker_scanner@evil.com"},
+                "payload_display": "POST /csrf/change-email [email=attacker_scanner@evil.com]",
+                "success_marker": "Profile notification email updated",
             },
         ]
 

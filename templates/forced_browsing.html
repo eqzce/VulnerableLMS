@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+        <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-blue-600">
+            <span>Module 7 • Campus Governance & Privileged Consoles</span>
+        </div>
+        <h1 class="text-xl font-bold text-slate-900 mt-1">🧭 Forced Browsing & Unrestricted URL Access</h1>
+        <p class="text-sm text-slate-600 mt-1">
+            Privileged administrative endpoints and faculty portals protected by security by obscurity.
+            <strong>To execute this attack, you must directly manipulate the URL path of the page in your browser address bar!</strong>
+        </p>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Left: URL Navigation & Discovered Sitemap -->
+        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
+            <h2 class="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3">🌐 Page URL Navigation & Endpoint Discovery</h2>
+
+            <!-- Current Address Bar Path Indicator -->
+            <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-slate-700">Active Browser URL Path:</span>
+                    <span class="text-[10px] font-mono px-2 py-0.5 rounded font-bold {{ 'bg-rose-100 text-rose-800' if is_admin_console else 'bg-slate-200 text-slate-700' }}">
+                        {{ 'PRIVILEGED ENDPOINT' if is_admin_console else 'PUBLIC ENDPOINT' }}
+                    </span>
+                </div>
+                <div class="p-2.5 bg-slate-900 text-amber-300 font-mono text-xs rounded-lg break-all select-all shadow-inner">
+                    http://127.0.0.1:5001{{ full_url_path }}
+                </div>
+                <p class="text-[11px] text-slate-500">
+                    💡 Edit the URL directly in your browser's address bar to reach hidden administrative panels.
+                </p>
+            </div>
+
+            <!-- Discovered Sitemap Directory Table -->
+            <div class="space-y-2">
+                <span class="text-xs font-bold text-slate-700 block">Discovered Portal Sitemap (Directory Enumeration):</span>
+                <div class="border border-slate-200 rounded-lg overflow-hidden text-xs">
+                    <table class="w-full text-left font-mono">
+                        <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px]">
+                            <tr>
+                                <th class="p-2">URL Path</th>
+                                <th class="p-2">Access Policy</th>
+                                <th class="p-2">Description</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 text-[11px]">
+                            <tr class="{{ 'bg-blue-50 font-semibold' if current_subpath == 'student-dashboard' else '' }}">
+                                <td class="p-2 text-blue-600">/portal/student-dashboard</td>
+                                <td class="p-2 text-emerald-600">Public</td>
+                                <td class="p-2 text-slate-600">General Student Portal (Current)</td>
+                            </tr>
+                            <tr class="{{ 'bg-blue-50 font-semibold' if current_subpath == 'faculty-directory' else '' }}">
+                                <td class="p-2 text-blue-600">/portal/faculty-directory</td>
+                                <td class="p-2 text-emerald-600">Public</td>
+                                <td class="p-2 text-slate-600">Open Faculty Office Listings</td>
+                            </tr>
+                            <tr class="{{ 'bg-amber-50 font-bold' if is_admin_console else '' }}">
+                                <td class="p-2 text-rose-600">/portal/admin-console</td>
+                                <td class="p-2 text-rose-600 font-bold">Confidential</td>
+                                <td class="p-2 text-slate-700">Dean Vance Provost Console (Target)</td>
+                            </tr>
+                            <tr>
+                                <td class="p-2 text-rose-600">/portal/secret-backup</td>
+                                <td class="p-2 text-rose-600 font-bold">Confidential</td>
+                                <td class="p-2 text-slate-700">Campus Database Archive & Keys</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Quick Navigation Helper Form -->
+            <form onsubmit="event.preventDefault(); window.location.href = document.getElementById('manual-path-input').value;" class="space-y-2 pt-2 border-t border-slate-100">
+                <label class="block text-xs font-medium text-slate-700">Address Bar Navigation Helper:</label>
+                <div class="flex gap-2">
+                    <input id="manual-path-input" type="text" value="{{ full_url_path }}"
+                           class="flex-1 px-3 py-2 rounded-lg border border-slate-300 font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                           placeholder="/portal/admin-console">
+                    <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-lg transition shadow-sm">
+                        Go to URL
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Right: Endpoint Response / Confidential Console -->
+        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
+            <div>
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                    <span class="text-xs font-bold text-slate-800 font-mono uppercase">
+                        PORTAL VIEW: {{ 'PROVOST & DEAN EXECUTIVE CONSOLE' if is_admin_console else ('SYSTEM BACKUP ARCHIVE' if is_backup else 'STUDENT DASHBOARD') }}
+                    </span>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded border {{ 'bg-rose-50 text-rose-700 border-rose-200' if is_admin_console else 'bg-slate-100 text-slate-700 border-slate-200' }}">
+                        {{ 'CLASSIFIED' if is_admin_console else 'ACTIVE' }}
+                    </span>
+                </div>
+
+                {% if error_msg %}
+                <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-mono space-y-2 mb-4">
+                    <div class="font-bold uppercase text-rose-900">⛔ ACCESS DENIED BY APPLICATION SECURITY</div>
+                    <div>{{ error_msg }}</div>
+                </div>
+                {% endif %}
+
+                {% if is_admin_console %}
+                <!-- Restricted Dean's Administrative Console -->
+                <div class="space-y-4">
+                    <div class="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs space-y-2">
+                        <div class="font-bold flex items-center gap-1.5 text-amber-900">
+                            <span>🏛️ DEAN & PROVOST ROBERT VANCE — EXECUTIVE CONSOLE</span>
+                        </div>
+                        <p class="text-[11px] text-amber-800">
+                            Authentication bypassed via forced browsing. Welcome to the central administration panel.
+                        </p>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3 text-xs">
+                        <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                            <span class="text-[10px] uppercase text-slate-400 font-bold block">Authority Role</span>
+                            <span class="font-bold text-slate-800">Provost & Dean of Faculty</span>
+                        </div>
+                        <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                            <span class="text-[10px] uppercase text-slate-400 font-bold block">System Clearance</span>
+                            <span class="font-bold text-rose-700">Level 5 (Full Administrative)</span>
+                        </div>
+                    </div>
+
+                    <div class="p-3.5 bg-slate-900 text-slate-100 rounded-lg font-mono text-xs space-y-2">
+                        <div class="text-amber-400 font-bold text-[11px] uppercase">CONFIDENTIAL CS-404 FINAL EXAM MASTER RUBRIC:</div>
+                        <div class="text-slate-300 text-[11px] leading-relaxed">
+                            • Exam Question 1: SQL Injection (Union-based metadata extraction)<br>
+                            • Exam Question 2: Stored Cross-Site Scripting via comment boards<br>
+                            • Exam Question 3: Broken Access Control & Forced Browsing evasion<br>
+                            • Master Decryption Key: <code class="text-emerald-400 font-bold">KEY_PROD_FACULTY_2026_9941a8</code>
+                        </div>
+                    </div>
+
+                    {% if fb_flag %}
+                    <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-mono space-y-1">
+                        <div class="font-bold text-emerald-800 uppercase">🏆 MODULE 7 COMPLETED — FORCED BROWSING MASTERED</div>
+                        <div class="p-2 bg-white rounded border border-emerald-300 font-bold select-all text-xs">
+                            {{ fb_flag }}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% elif is_backup %}
+                <!-- Restricted System Backup -->
+                <div class="space-y-4">
+                    <div class="p-4 rounded-xl bg-purple-50 border border-purple-200 text-purple-900 text-xs">
+                        <div class="font-bold">💾 RESTRICTED CAMPUS DATABASE BACKUP ARCHIVE</div>
+                        <div class="text-[11px] mt-1">Archive file: <code class="font-mono">unimoodle_backup_20261111.sql.gz</code></div>
+                    </div>
+                    {% if fb_flag %}
+                    <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-mono select-all">
+                        {{ fb_flag }}
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% else %}
+                <!-- Public Student Dashboard View -->
+                <div class="space-y-4">
+                    <div class="p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs space-y-2">
+                        <div class="font-bold text-blue-800">👋 Welcome to UniMoodle Student Dashboard</div>
+                        <p class="text-[11px] text-blue-700">
+                            Logged-in Student: <strong>Alice Mercer</strong> (Student ID: 2). Enrolled Course: CS-404 Web Application Security.
+                        </p>
+                    </div>
+
+                    <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2 text-slate-600">
+                        <div class="font-bold text-slate-800">📌 Important Student Notice:</div>
+                        <p class="text-[11px] leading-relaxed">
+                            Final exam master keys and grade override utilities are strictly confidential and housed inside the Dean's Administrative Console (<code class="font-mono text-blue-600">/portal/admin-console</code>).
+                            Unauthorized access to privileged URL endpoints is monitored by campus IT security.
+                        </p>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Footer Reset Link -->
+            <div class="pt-4 mt-6 border-t border-slate-100 flex items-center justify-between text-xs">
+                <a href="{{ url_for('forced_browsing_lab', subpath='student-dashboard') }}" class="text-blue-600 hover:underline font-mono">
+                    ← Return to Public Student Dashboard
+                </a>
+                <span class="text-slate-400 text-[11px]">UniMoodle RBAC v2.4</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -282,101 +282,51 @@ def init_db():
 
     c.execute("DELETE FROM waf_rules")
     default_rules = [
-        # --- UNIVERSITY LAB VIRTUAL PATCH: MODULE 3 (BURP VAULT & PARAMETER TAMPERING) ---
+        # --- UNIVERSITY VIRTUAL PATCHES (APPLICATION-SPECIFIC BUSINESS LOGIC) ---
         (
             1003,
-            "WAF-BAC-BASIC",
+            "WAF-VAULT-BASIC",
             "Access Control",
             1,
             "ARGS:is_admin|REQUEST_COOKIES:user_role|REQUEST_COOKIES:auth_token|REQUEST_COOKIES:vault_sig|REQUEST_HEADERS:X-Forwarded-For|REQUEST_HEADERS:X-Original-URL|ARGS:sim_exploit",
             r"(^(true|TRUE|admin|ADMIN|low|medium|high)$|dXNlcj1hZG1pbg==|127\.0\.0\.1|/admin/vault|52c876f2a69205692536a1f2857b4e4c70312142b068e23f4d87d506680183c5)",
-            "University Virtual Patch (L1): Blocks Burp parameter tampering (is_admin=true, user_role=admin, Base64 token dXNlcj1hZG1pbg==).",
+            "Protects Dean's Vault (/vault) against client-side parameter tampering (is_admin=true, role=admin, Base64 auth token).",
             "CRITICAL",
-            1,
-        ),
-        (
-            1031,
-            "WAF-BAC-PRIVILEGE-ESCALATION",
-            "Access Control",
-            1,
-            "ARGS|REQUEST_COOKIES",
-            r"(?i)\b(role=(root|superuser|administrator)|admin=1|is_staff=true|is_dean=true)\b",
-            "University Virtual Patch (L1): Blocks direct parameter tampering attempting administrative privilege escalation.",
-            "HIGH",
             1,
         ),
         (
             2003,
-            "WAF-BAC-BYPASS",
+            "WAF-VAULT-BYPASS",
             "Access Control",
             2,
             "REQUEST_COOKIES:auth_token|REQUEST_COOKIES:vault_sig|REQUEST_HEADERS:X-Forwarded-For|REQUEST_HEADERS:X-Original-URL|ARGS:sim_exploit",
             r"(?i)(dXNlcj1hZG1pbg==|dXNlcj1BRE1JTg==|localhost|127\.0\.0\.1|/admin|52c876f2a69205692536a1f2857b4e4c70312142b068e23f4d87d506680183c5|^bypass$)",
-            "University Virtual Patch (L2): Deep inspection of uppercase Base64 token (dXNlcj1BRE1JTg==) and X-Forwarded-For bypass.",
+            "Protects Dean's Vault (L2) against uppercase Base64 token (user=ADMIN) and X-Forwarded-For: localhost spoofing.",
             "CRITICAL",
             1,
         ),
-        (
-            2031,
-            "WAF-BAC-PROXY-SPOOF",
-            "Access Control",
-            2,
-            "REQUEST_HEADERS:X-Real-IP|REQUEST_HEADERS:X-Originating-IP|REQUEST_HEADERS:Client-IP",
-            r"(?i)(127\.0\.0\.1|localhost|0\.0\.0\.0|::1)",
-            "University Virtual Patch (L2): Detects spoofing of internal loopback origin in secondary proxy headers.",
-            "HIGH",
-            1,
-        ),
-
-        # --- UNIVERSITY LAB VIRTUAL PATCH: MODULE 7 (FORCED BROWSING & HIDDEN CONSOLES) ---
         (
             1030,
             "WAF-FORCED-BROWSING-ADMIN",
-            "Forced Browsing / URL Access",
+            "Forced Browsing",
             1,
             "REQUEST_URI",
             r"(?i)(/admin-console|/secret-backup|/admin_panel|/faculty-console)",
-            "University Virtual Patch (L1): Blocks direct URL forced browsing to Dean's administrative consoles and backups.",
+            "Protects unlisted administrative consoles and backups from direct URL manipulation in browser address bar.",
             "CRITICAL",
             1,
         ),
-        (
-            2030,
-            "WAF-URL-PATH-TRAVERSAL-BYPASS",
-            "Forced Browsing / URL Access",
-            2,
-            "REQUEST_URI",
-            r"(?i)(%2e%2e|/\.\./|/public/\.\./|/faculty/\.\./|admin-console;|admin-console%00|%61dmin-console)",
-            "University Virtual Patch (L2): Inspects URL-encoding and directory traversal targeting Dean's console.",
-            "CRITICAL",
-            1,
-        ),
-
-        # --- UNIVERSITY LAB VIRTUAL PATCH: MODULE 7 (IDOR - STUDENT DOSSIERS) ---
         (
             1043,
-            "WAF-IDOR-NUMERIC-OBJECT",
+            "WAF-IDOR-DEAN-DOSSIER",
             "IDOR",
             1,
             "ARGS:student_id|REQUEST_URI",
             r"(?i)(\bstudent_id=1\b|^1$)",
-            "University Virtual Patch (L1): Protects Dean's confidential dossier record #1 from unauthorized direct access.",
+            "Protects Provost & Department Chair confidential academic dossier (#1) from unauthorized direct reference.",
             "CRITICAL",
             1,
         ),
-        (
-            2043,
-            "WAF-IDOR-BYPASS",
-            "IDOR",
-            2,
-            "ARGS:student_id|REQUEST_URI",
-            r"(?i)(MQ==|MQ%3D%3D|MQ%3d%3d|c4ca4238a0b923820dcc509a6f75849b|\bstudent_id=01\b|^01$)",
-            "University Virtual Patch (L2): Deep inspection of encoded Base64 (MQ==), MD5 hashed or zero-padded direct references.",
-            "CRITICAL",
-            1,
-        ),
-
-        # --- UNIVERSITY LAB VIRTUAL PATCH: MODULE 8 (CSRF PROFILE HIJACK) ---
         (
             1049,
             "WAF-CSRF-ANOMALOUS-ORIGIN",
@@ -384,7 +334,7 @@ def init_db():
             2,
             "REQUEST_HEADERS:Referer|ARGS:email",
             r"(?i)(attacker\.com|evil\.com)",
-            "University Virtual Patch (L2): Detects anomalous cross-origin referrers and known attacker domains in state-changing parameters.",
+            "Detects cross-origin requests originating from known attacker domains targeting student email updates.",
             "HIGH",
             1,
         ),
@@ -491,7 +441,7 @@ def write_coraza_config_files():
         "",
         "# 5. University Virtual Patching Rules (Business Logic Protection)",
         "# Only evaluate Access Control cookie/header rules on POST requests so GET page loads are never locked out by stale cookies",
-        'SecRule REQUEST_METHOD "@streq GET" "id:998,phase:1,pass,nolog,ctl:ruleRemoveById=1003,ctl:ruleRemoveById=1031,ctl:ruleRemoveById=2003,ctl:ruleRemoveById=2031"',
+        'SecRule REQUEST_METHOD "@streq GET" "id:998,phase:1,pass,nolog,ctl:ruleRemoveById=1003,ctl:ruleRemoveById=2003"',
         "",
     ]
 

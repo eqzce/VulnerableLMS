@@ -7,7 +7,7 @@
 :5001 {
     coraza_waf {
         directives `
-            # Revision: 1794494132.765095
+            # Revision: 1794495653.535330
             Include ./coraza_rules.conf
         `
     }

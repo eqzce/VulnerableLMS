@@ -45,6 +45,13 @@
                 Submit Normal Student Request (is_admin=false)
             </button>
         </form>
+
+        <form action="{{ url_for('vault_lab') }}" method="POST" class="pt-2">
+            <input type="hidden" name="sim_exploit" value="bypass">
+            <button type="submit" class="w-full py-2.5 px-4 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 font-semibold text-xs transition shadow-sm">
+                ⚡ Simulate WAF L1 Bypass (auth_token='user=ADMIN' + XFF: localhost)
+            </button>
+        </form>
     </div>
 
     <!-- Right: Authorization Response -->

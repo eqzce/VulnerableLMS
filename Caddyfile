@@ -7,17 +7,20 @@
 :5001 {
     coraza_waf {
         directives `
-            # Revision: 1794496083.518931
+            # Revision: 1794503995.710164
             Include ./coraza_rules.conf
         `
     }
-    reverse_proxy 127.0.0.1:5002
+    reverse_proxy 127.0.0.1:5002 {
+        header_up X-Forwarded-For {header.X-Forwarded-For}
+    }
     handle_errors {
         rewrite * /coraza-blocked
         reverse_proxy 127.0.0.1:5002 {
             method GET
             header_up -Content-Length
             header_up -Content-Type
+            header_up X-Forwarded-For {header.X-Forwarded-For}
         }
     }
 }

@@ -100,5 +100,8 @@
     if (window.location.search.includes('reflect=')) {
         window.history.replaceState({}, document.title, window.location.pathname);
     }
+    document.querySelectorAll('.font-medium input[autofocus]').forEach(function(inp) {
+        setTimeout(function() { inp.focus(); }, 150);
+    });
 </script>
 {% endblock %}

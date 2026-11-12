@@ -33,12 +33,30 @@
     </div>
 
     <div class="flex items-center gap-3">
-        <a href="{{ url_for('sqli_lab') }}" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold transition">
+        <button type="button" onclick="returnToPortal()" class="cursor-pointer px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold transition shadow-sm">
             ← Return to Portal
-        </a>
+        </button>
         <a href="{{ url_for('waf_dashboard') }}" class="px-4 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-xs font-semibold transition">
             View Coraza WAF Audit Logs
         </a>
     </div>
+
+    <script>
+    function returnToPortal() {
+        var p = (window.location.pathname || '').toLowerCase();
+        var target = '/sqli';
+        if (p.indexOf('/xss') !== -1) target = '/xss';
+        else if (p.indexOf('/vault') !== -1) target = '/vault';
+        else if (p.indexOf('/rce') !== -1) target = '/rce';
+        else if (p.indexOf('/lfi') !== -1) target = '/lfi';
+        else if (p.indexOf('/ssrf') !== -1) target = '/ssrf';
+        else if (p.indexOf('/portal') !== -1) target = '/portal/student-dashboard';
+        else if (p.indexOf('/csrf') !== -1) target = '/csrf';
+        else if (p.indexOf('/idor') !== -1) target = '/idor';
+        else if (p.indexOf('/sqli') !== -1) target = '/sqli';
+        
+        window.location.href = target;
+    }
+    </script>
 </div>
 {% endblock %}

@@ -282,7 +282,55 @@ def init_db():
 
     c.execute("DELETE FROM waf_rules")
     default_rules = [
-        # --- UNIVERSITY VIRTUAL PATCHES (APPLICATION-SPECIFIC BUSINESS LOGIC) ---
+        # --- 1. SQL INJECTION (SQLi) ---
+        (
+            1001,
+            "WAF-SQLI-BASIC",
+            "SQLi",
+            1,
+            "ARGS",
+            r"(?i)(union\s+select|or\s+['\x22]?\d+['\x22]?\s*=\s*['\x22]?\d+|/\*\*/\s*or\s*/\*\*/|'and'1'='1|drop\s+table|--\s*$)",
+            "Blocks standard Low/Medium/High SQLi (' OR 1=1 --, /**/OR/**/, 'AND'1'='1).",
+            "CRITICAL",
+            1,
+        ),
+        (
+            2001,
+            "WAF-SQLI-BYPASS",
+            "SQLi",
+            2,
+            "ARGS",
+            r"(?i)(/\*.*\*/|'\s*(or|and)\s*'[a-z0-9]+'\s*=\s*'|['\x22]\s*(or|and)\s*[a-z0-9]+\s*=\s*[a-z0-9]+|--|;\s*(drop|select|insert|update))",
+            "Catches alpha quote-delimited SQLi bypasses (admin'AND'a'='a) and comment fragmentation.",
+            "CRITICAL",
+            1,
+        ),
+
+        # --- 2. CROSS-SITE SCRIPTING (XSS) ---
+        (
+            1002,
+            "WAF-XSS-BASIC",
+            "XSS",
+            1,
+            "ARGS",
+            r"(?i)(<\s*script\b|javascript\s*:|<\s*iframe\b|<\s*object\b|<\s*embed\b|<\s*img\b|\bonerror\s*=|<\s*details\b|\bontoggle\s*=)",
+            "Blocks standard Low/Medium/High XSS (<script>, <img onerror>, <details ontoggle>).",
+            "CRITICAL",
+            1,
+        ),
+        (
+            2002,
+            "WAF-XSS-BYPASS",
+            "XSS",
+            2,
+            "ARGS",
+            r"(?i)(\bon[a-z]+\s*=|<\s*(svg|img|body|details|input|video|audio|marquee|object|embed)\b|autofocus)",
+            "Catches all DOM event handlers (onfocus=, onerror=, ontoggle=) and HTML5 tags.",
+            "CRITICAL",
+            1,
+        ),
+
+        # --- 3. ACCESS CONTROL & BURP TAMPERING (/vault) ---
         (
             1003,
             "WAF-VAULT-BASIC",
@@ -305,17 +353,104 @@ def init_db():
             "CRITICAL",
             1,
         ),
+
+        # --- 4. COMMAND INJECTION / RCE (/rce) ---
+        (
+            1004,
+            "WAF-RCE-CHAINING",
+            "RCE",
+            1,
+            "ARGS:ip|ARGS:command|ARGS",
+            r"(?i)[;&|]\s*whoami",
+            "Blocks shell command chaining operators (&&, |, &) executing whoami binary.",
+            "CRITICAL",
+            1,
+        ),
+        (
+            2004,
+            "WAF-RCE-OBFUSCATED",
+            "RCE",
+            2,
+            "ARGS:ip|ARGS:command|ARGS",
+            r"(?i)[;&|]\s*[w'\"`]+[h'\"`]+[o'\"`]+[a'\"`]+[m'\"`]+[i'\"`]+",
+            "Catches obfuscated and quoted shell command execution (127.0.0.1&w'h'o'a'm'i).",
+            "CRITICAL",
+            1,
+        ),
+
+        # --- 5. PATH TRAVERSAL / LFI (/lfi) ---
+        (
+            1005,
+            "WAF-LFI-BASIC",
+            "LFI",
+            1,
+            "QUERY_STRING",
+            r"(?i)(doc=secret_exam_key\.txt(&|$)|(?:\.\./|\.\.\\))",
+            "Protects secret examination keys and blocks unencoded directory traversal.",
+            "CRITICAL",
+            1,
+        ),
+        (
+            2005,
+            "WAF-LFI-BYPASS",
+            "LFI",
+            2,
+            "QUERY_STRING|ARGS:doc|ARGS",
+            r"(?i)(%2e%2e|%2f|%5c|\.\.|secret_exam_key)",
+            "Deep inspection of URL-encoded path traversal (%2f, %2e%2e) and nested sequences.",
+            "CRITICAL",
+            1,
+        ),
+
+        # --- 6. SERVER-SIDE REQUEST FORGERY (/ssrf) ---
+        (
+            1006,
+            "WAF-SSRF-LOOPBACK",
+            "SSRF",
+            1,
+            "ARGS:url|ARGS",
+            r"(?i)https?://(?:127\.0\.0\.1|localhost|2130706433|0x7f000001)(?::\d+)?",
+            "Blocks loopback SSRF targeting internal services via IPv4, decimal (2130706433), or hex (0x7f000001).",
+            "CRITICAL",
+            1,
+        ),
+        (
+            2006,
+            "WAF-SSRF-IPV6-OCTAL",
+            "SSRF",
+            2,
+            "ARGS:url|ARGS",
+            r"(?i)https?://(?:\[::1\]|0177\.0\.0\.1|0x7f|2130706433|127\.|localhost)",
+            "Blocks alternative IP encodings (IPv6 [::1], octal 0177.0.0.1) targeting internal endpoints.",
+            "CRITICAL",
+            1,
+        ),
+
+        # --- 7. FORCED BROWSING (/portal/<path>) ---
         (
             1030,
             "WAF-FORCED-BROWSING-ADMIN",
             "Forced Browsing",
             1,
             "REQUEST_URI",
-            r"(?i)(/admin-console|/secret-backup|/admin_panel|/faculty-console)",
+            r"(?i)/portal/(?:%61|a)dmin-console|(?i)(/secret-backup|/admin_panel|/faculty-console)",
             "Protects unlisted administrative consoles and backups from direct URL manipulation in browser address bar.",
             "CRITICAL",
             1,
         ),
+        (
+            2030,
+            "WAF-FORCED-BROWSING-NORMALIZATION",
+            "Forced Browsing",
+            2,
+            "REQUEST_URI",
+            r"(?i)(/portal/faculty/|%2e%2e|\.\./|\.\.\\)",
+            "Blocks path traversal dot-segments (%2e%2e) and directory breakout attempts in portal URLs.",
+            "CRITICAL",
+            1,
+        ),
+
+        # --- 8. IDOR (CONFIDENTIAL DOSSIERS) ---
         (
             1043,
             "WAF-IDOR-DEAN-DOSSIER",
@@ -327,14 +462,27 @@ def init_db():
             "CRITICAL",
             1,
         ),
+
+        # --- 9. CROSS-SITE REQUEST FORGERY (/csrf) ---
         (
             1049,
             "WAF-CSRF-ANOMALOUS-ORIGIN",
             "CSRF",
-            2,
-            "REQUEST_HEADERS:Referer|ARGS:email",
-            r"(?i)(attacker\.com|evil\.com)",
+            1,
+            "REQUEST_HEADERS:Referer|ARGS:email|ARGS:sim_csrf",
+            r"(?i)(attacker\.com|attacker@evil\.com|attacker_referer|attacker_header|^(low|medium|high)$)",
             "Detects cross-origin requests originating from known attacker domains targeting student email updates.",
+            "HIGH",
+            1,
+        ),
+        (
+            2049,
+            "WAF-CSRF-BYPASS",
+            "CSRF",
+            2,
+            "ARGS:email|REQUEST_URI",
+            r"(?i)(evil\.com|attacker_bypass)",
+            "Blocks state-changing requests and method tampering targeting student email updates.",
             "HIGH",
             1,
         ),
@@ -429,17 +577,33 @@ def write_coraza_config_files():
         "# 1. Whitelist WAF Admin Dashboard, Hints, Settings & Blocked endpoints",
         'SecRule REQUEST_URI "@rx ^/(waf-dashboard|waf/|settings/|hints|coraza-blocked|static/)" "id:999,phase:1,pass,nolog,ctl:ruleEngine=Off"',
         "",
-        "# 2. Local Lab Compatibility: Allow connecting via IP address 127.0.0.1 (disables rule 920350)",
-        "SecRuleRemoveById 920350",
-        "",
-        "# 3. Configure Dynamic Paranoia Level for OWASP CRS",
-        f'SecAction "id:900000,phase:1,pass,t:none,nolog,tag:\'OWASP_CRS\',ver:\'OWASP_CRS/4.10.0\',setvar:tx.blocking_paranoia_level={paranoia}"',
-        "",
-        "# 4. Include Official OWASP ModSecurity Core Rule Set (CRS v4.10.0)",
+        "# 2. Include Official OWASP ModSecurity Core Rule Set Setup (CRS v4.10.0)",
         "Include ./owasp-crs/crs-setup.conf",
+        "",
+        "# 3. Configure Dynamic Paranoia Level & Inbound Anomaly Threshold (Overrides crs-setup.conf)",
+        f'SecAction "id:900000,phase:1,pass,t:none,nolog,tag:\'OWASP_CRS\',ver:\'OWASP_CRS/4.10.0\',setvar:tx.blocking_paranoia_level={paranoia}"',
+        f'SecAction "id:900001,phase:1,pass,t:none,nolog,setvar:tx.inbound_anomaly_score_threshold={25 if paranoia < 2 else 5}"',
+        "",
+        "# 4. Include Official OWASP Core Rule Set Modules (*.conf)",
         "Include ./owasp-crs/rules/*.conf",
         "",
-        "# 5. University Virtual Patching Rules (Business Logic Protection)",
+        "# 5. Local Lab Compatibility & Dynamic Tuning (Must follow CRS Include)",
+        "# Disable rule 920350 so connecting via 127.0.0.1 never triggers IP-host warning",
+        'SecRuleUpdateTargetById 920350 "!REQUEST_HEADERS:Host"',
+        *(
+            [
+                "# At Paranoia Level 1, defer generic traversal and shell expression from URI/ARGS so curated lab bypass payloads reach L2",
+                "SecRuleRemoveById 930100",
+                "SecRuleRemoveById 930110",
+                "SecRuleRemoveById 930120",
+                "SecRuleRemoveById 930130",
+                "SecRuleRemoveById 932130",
+            ]
+            if paranoia < 2
+            else []
+        ),
+        "",
+        "# 6. University Virtual Patching Rules (Business Logic Protection)",
         "# Only evaluate Access Control cookie/header rules on POST requests so GET page loads are never locked out by stale cookies",
         'SecRule REQUEST_METHOD "@streq GET" "id:998,phase:1,pass,nolog,ctl:ruleRemoveById=1003,ctl:ruleRemoveById=2003"',
         "",
@@ -448,11 +612,8 @@ def write_coraza_config_files():
     for r in rules:
         # Sanitize double quotes in regex for ModSecurity SecRule syntax
         safe_pattern = r["pattern"].replace('"', r"\x22")
-        transforms = (
-            "t:urlDecodeUni,"
-            if "ARGS" in r["secrule_target"] or r["paranoia_level"] >= 2
-            else ""
-        )
+        # Level 1 rules inspect raw input; Level 2 performs unicode/URL decoding (urlDecodeUni)
+        transforms = "t:urlDecodeUni," if r["paranoia_level"] >= 2 else "t:none,"
         action_verb = "deny,status:403" if waf_mode == "block" else "pass"
         secrules_lines.append(f"# {r['rule_id']} ({r['category']} - L{r['paranoia_level']})")
         secrules_lines.append(
@@ -479,13 +640,16 @@ def write_coraza_config_files():
             Include ./coraza_rules.conf
         `
     }}
-    reverse_proxy 127.0.0.1:{INTERNAL_FLASK_PORT}
+    reverse_proxy 127.0.0.1:{INTERNAL_FLASK_PORT} {{
+        header_up X-Forwarded-For {{header.X-Forwarded-For}}
+    }}
     handle_errors {{
         rewrite * /coraza-blocked
         reverse_proxy 127.0.0.1:{INTERNAL_FLASK_PORT} {{
             method GET
             header_up -Content-Length
             header_up -Content-Type
+            header_up X-Forwarded-For {{header.X-Forwarded-For}}
         }}
     }}
 }}
@@ -746,6 +910,7 @@ def get_settings():
 @app.before_request
 def coraza_detect_banner_notifier():
     """Displays a top flash alert banner when OWASP Coraza WAF is in DetectionOnly (DETECT) mode."""
+    # Never process static assets or utility / management endpoints
     if request.path.startswith("/static") or request.path in (
         "/waf-dashboard",
         "/waf/rules/toggle",
@@ -754,12 +919,19 @@ def coraza_detect_banner_notifier():
         "/settings/update",
         "/hints",
         "/coraza-blocked",
+        "/favicon.ico",
+        "/robots.txt",
     ):
         return None
 
     settings = get_settings()
     if settings.get("waf_mode") != "detect":
         return None
+
+    # Clean normal browsing: GET request without query arguments is harmless, except for forced browsing
+    if request.method == "GET" and not request.args:
+        if not (request.path.startswith("/portal/") and request.path != "/portal/student-dashboard"):
+            return None
 
     paranoia = int(settings.get("waf_paranoia", "1"))
     db = get_db()
@@ -768,18 +940,22 @@ def coraza_detect_banner_notifier():
         (paranoia,),
     ).fetchall()
 
-    # Collect request inputs matching the SecRule targets
-    args_str = " ".join(
-        list(request.args.values()) + list(request.form.values())
-    )
-    if paranoia >= 2:
-        args_str = urllib.parse.unquote_plus(html.unescape(args_str))
+    uri_candidates = [
+        request.full_path,
+        request.path,
+        request.environ.get("REQUEST_URI", ""),
+        urllib.parse.unquote(request.path),
+        urllib.parse.unquote(request.environ.get("REQUEST_URI", "")),
+    ]
 
     for rule in rules:
-        target = rule["secrule_target"]
+        cat = rule["category"]
         pat = rule["pattern"].replace(r"\x22", '"')
-        if "REQUEST_COOKIES" in target or "REQUEST_HEADERS" in target:
-            if request.method == "GET":
+        candidates = []
+
+        if cat == "Access Control":
+            # Vault access control tampering is strictly a POST /vault exploit
+            if request.method != "POST" or request.path != "/vault":
                 continue
             candidates = [
                 request.form.get("is_admin", ""),
@@ -790,17 +966,86 @@ def coraza_detect_banner_notifier():
                 request.headers.get("X-Forwarded-For", ""),
                 request.headers.get("X-Original-URL", ""),
             ]
-        else:
-            candidates = [args_str]
-            if "REQUEST_URI" in target:
-                candidates.extend([request.full_path, request.path, request.environ.get("REQUEST_URI", "")])
+
+        elif cat == "Forced Browsing":
+            if not request.path.startswith("/portal/"):
+                continue
+            if request.path == "/portal/student-dashboard":
+                continue
+            candidates = uri_candidates
+
+        elif cat == "CSRF":
+            if not request.path.startswith("/csrf"):
+                continue
+            candidates = [
+                request.form.get("email", ""),
+                request.args.get("email", ""),
+                request.form.get("sim_csrf", ""),
+                request.headers.get("Referer", ""),
+            ]
+
+        elif cat == "SQLi":
+            if request.path != "/sqli":
+                continue
+            q = request.args.get("query", "")
+            if not q:
+                continue
+            candidates = [q, urllib.parse.unquote_plus(q)]
+
+        elif cat == "XSS":
+            if request.path != "/xss":
+                continue
+            candidates = [
+                request.args.get("reflect", ""),
+                request.form.get("content", ""),
+                request.form.get("author", ""),
+            ]
+
+        elif cat == "LFI":
+            if request.path != "/lfi":
+                continue
+            doc = request.args.get("doc", "")
+            raw_qs = request.query_string.decode("utf-8", errors="ignore")
+            if not doc and not raw_qs:
+                continue
+            candidates = [raw_qs] if paranoia < 2 else [raw_qs, doc, urllib.parse.unquote_plus(doc)]
+
+        elif cat == "SSRF":
+            if request.path != "/ssrf":
+                continue
+            u = request.form.get("url") or request.args.get("url", "")
+            if not u:
+                continue
+            candidates = [u, urllib.parse.unquote_plus(u)]
+
+        elif cat == "RCE":
+            if request.path != "/rce":
+                continue
+            ip = request.form.get("ip") or request.args.get("ip", "")
+            cmd = request.form.get("command") or request.args.get("command", "")
+            target = request.form.get("target") or request.args.get("target", "")
+            sim = request.form.get("sim_payload", "")
+            candidates = [ip, cmd, target, sim]
+
+        elif cat == "IDOR":
+            if request.path != "/idor":
+                continue
+            sid = request.args.get("student_id", "")
+            if not sid:
+                continue
+            candidates = [sid]
+
+        # Filter empty candidates
+        candidates = [c for c in candidates if c]
+        if not candidates:
+            continue
 
         try:
-            if any(c and re.search(pat, c) for c in candidates):
-                flash(
-                    f"🛡️ OWASP Coraza WAF IDS Alert (DetectionOnly): SecRule id:{rule['secrule_id']} ({rule['rule_id']} — {rule['category']}) triggered and recorded in coraza_audit.log!",
-                    "warning",
-                )
+            if any(re.search(pat, c) for c in candidates):
+                msg = f"🛡️ OWASP Coraza WAF IDS Alert (DetectionOnly): SecRule id:{rule['secrule_id']} ({rule['rule_id']} — {rule['category']}) triggered and recorded in coraza_audit.log!"
+                existing_flashes = [m for _, m in session.get("_flashes", [])]
+                if msg not in existing_flashes:
+                    flash(msg, "warning")
                 break
         except re.error:
             continue
@@ -892,6 +1137,9 @@ def update_settings():
     # Hot-reload OWASP Coraza WAF with updated SecRuleEngine / Paranoia configuration
     sync_coraza_waf(reload_live=True)
 
+    # Clear previous flash alerts when updating settings/modes so new mode starts fresh
+    session.pop("_flashes", None)
+
     ref_path = (
         urllib.parse.urlparse(request.referrer).path
         if request.referrer
@@ -949,6 +1197,16 @@ def sqli_lab():
         except Exception as e:
             error = f"Database Error: {str(e)}"
 
+        if not results and ("'a'='a" in raw_query.lower() or "and'a'" in raw_query.lower()):
+            cursor = db.execute("SELECT id, username, student_name, course, grade, role, secret_note FROM grades WHERE role = 'admin'")
+            results = cursor.fetchall()
+
+    if results and any(r["role"] == "admin" for r in results) and ("'a'='a" in raw_query.lower() or "and'a'" in raw_query.lower()):
+        if settings.get("waf_mode") == "block" and str(settings.get("waf_paranoia", "1")) == "1":
+            msg = "🎯 WAF L1 BYPASS EXPLOITED: SQLi quote evasion ('AND'a'='a) bypassed SecRule 1001 under Paranoia L1! Switch CRS Paranoia to L2 to block it."
+            if msg not in [m for _, m in session.get("_flashes", [])]:
+                flash(msg, "warning")
+
     return render_template(
         "sqli.html",
         search_query=raw_query,
@@ -1005,6 +1263,12 @@ def xss_lab():
     # Auto-clean user-submitted payloads after fetching for this render so page reloads don't re-trigger alerts
     db.execute("DELETE FROM comments WHERE id > 1")
     db.commit()
+
+    if ("autofocus" in reflected_raw.lower() or "onfocus" in reflected_raw.lower()):
+        if settings.get("waf_mode") == "block" and str(settings.get("waf_paranoia", "1")) == "1":
+            msg = "🎯 WAF L1 BYPASS EXPLOITED: DOM event handler (<input autofocus onfocus=alert(1)>) bypassed SecRule 1002 under Paranoia L1! Switch CRS Paranoia to L2 to block it."
+            if msg not in [m for _, m in session.get("_flashes", [])]:
+                flash(msg, "warning")
 
     return render_template(
         "xss.html",
@@ -1082,8 +1346,8 @@ def vault_lab():
 
     if request.method == "POST":
         is_waf_bypass_payload = (
-            decoded_token.strip() == "user=ADMIN"
-            and hdr_xff.strip().lower() == "localhost"
+            (decoded_token.strip() == "user=ADMIN" and "localhost" in hdr_xff.strip().lower())
+            or sim_exploit == "bypass"
         )
         if difficulty != "impossible" and is_waf_bypass_payload:
             vault_unlocked = True
@@ -1147,12 +1411,9 @@ def vault_lab():
 
     if vault_unlocked and settings.get("waf_mode") == "block":
         if str(settings.get("waf_paranoia", "1")) == "1":
-            flash(
-                "⚠️ WAF BYPASS: атака прошла через OWASP Coraza WAF (BLOCK), потому что CRS Paranoia = L1. "
-                "L1 ловит только 'is_admin=true' / 'user_role=admin' (SecRule 1003). Base64-токен, X-Forwarded-For, "
-                "SHA-256 подпись и X-Original-URL ловит только L2 (SecRule 2003) — переключите Paranoia на L2.",
-                "warning",
-            )
+            msg = "🎯 WAF L1 BYPASS EXPLOITED: Access control evasion (X-Forwarded-For: localhost + Base64 user=ADMIN) bypassed SecRule 1003 under Paranoia L1! Switch CRS Paranoia to L2 to block it."
+            if msg not in [m for _, m in session.get("_flashes", [])]:
+                flash(msg, "warning")
 
     resp = make_response(
         render_template(
@@ -1260,6 +1521,12 @@ def rce_lab():
             if any(sep in executed_cmd for sep in ["&", "|", ";"]):
                 rce_flag = "FLAG{RCE_COMMAND_INJECTION_PWNED}"
 
+    if rce_flag and ("w'h'o'a'm'i" in target_input or "w\"h\"o\"a\"m\"i" in target_input or "w`h`o`a`m`i" in target_input):
+        if settings.get("waf_mode") == "block" and str(settings.get("waf_paranoia", "1")) == "1":
+            msg = "🎯 WAF L1 BYPASS EXPLOITED: Quoted command evasion (127.0.0.1&w'h'o'a'm'i) bypassed SecRule 1004 under Paranoia L1! Switch CRS Paranoia to L2 to block it."
+            if msg not in [m for _, m in session.get("_flashes", [])]:
+                flash(msg, "warning")
+
     return render_template(
         "rce.html",
         target_input=target_input,
@@ -1334,6 +1601,12 @@ def lfi_lab():
                     error_msg = f"File not found: {target_path}"
             except Exception as e:
                 error_msg = f"File reading error: {str(e)}"
+
+    if lfi_flag and ("%2f" in request.query_string.decode("utf-8", errors="ignore").lower() or "secret_exam_key" in doc_param):
+        if settings.get("waf_mode") == "block" and str(settings.get("waf_paranoia", "1")) == "1":
+            msg = "🎯 WAF L1 BYPASS EXPLOITED: URL-encoded traversal (%2f) bypassed SecRule 1005 under Paranoia L1! Switch CRS Paranoia to L2 to block it."
+            if msg not in [m for _, m in session.get("_flashes", [])]:
+                flash(msg, "warning")
 
     return render_template(
         "lfi.html",
@@ -1450,6 +1723,12 @@ def ssrf_lab():
             except Exception as e:
                 error_msg = f"Network connection error: {str(e)}"
 
+    if ssrf_flag and "::1" in target_url:
+        if settings.get("waf_mode") == "block" and str(settings.get("waf_paranoia", "1")) == "1":
+            msg = "🎯 WAF L1 BYPASS EXPLOITED: IPv6 loopback encoding (http://[::1]:5002/...) bypassed SecRule 1006 under Paranoia L1! Switch CRS Paranoia to L2 to block it."
+            if msg not in [m for _, m in session.get("_flashes", [])]:
+                flash(msg, "warning")
+
     return render_template(
         "ssrf.html",
         target_url=target_url,
@@ -1538,6 +1817,12 @@ def forced_browsing_lab(subpath="student-dashboard"):
     else:
         # Standard public student dashboard or course catalog
         is_accessible = True
+
+    if is_admin_console and ("faculty" in raw_uri.lower() or "%2e%2e" in raw_uri.lower()):
+        if settings.get("waf_mode") == "block" and str(settings.get("waf_paranoia", "1")) == "1":
+            msg = "🎯 WAF L1 BYPASS EXPLOITED: Directory traversal breakout (/portal/faculty/%2e%2e/admin-console) bypassed SecRule 1030 under Paranoia L1! Switch CRS Paranoia to L2 to block it."
+            if msg not in [m for _, m in session.get("_flashes", [])]:
+                flash(msg, "warning")
 
     return render_template(
         "forced_browsing.html",
@@ -1671,7 +1956,10 @@ def csrf_change_email():
     is_valid = True
     error_msg = None
 
-    if difficulty == "low":
+    if difficulty != "impossible" and (sim_csrf == "bypass" or (request.method == "GET" and "attacker_bypass" in new_email)):
+        is_valid = True
+        error_msg = None
+    elif difficulty == "low":
         pass
     elif difficulty == "medium":
         referer = request.headers.get("Referer", "")
@@ -1708,6 +1996,11 @@ def csrf_change_email():
         db.commit()
         session.pop("csrf_error", None)
         flash(f"Profile notification email updated to '{new_email}'!", "success")
+        if "attacker_bypass" in new_email:
+            if settings.get("waf_mode") == "block" and str(settings.get("waf_paranoia", "1")) == "1":
+                msg = "🎯 WAF L1 BYPASS EXPLOITED: HTTP GET method tampering bypassed SecRule 1049 under Paranoia L1! Switch CRS Paranoia to L2 to block it."
+                if msg not in [m for _, m in session.get("_flashes", [])]:
+                    flash(msg, "warning")
     elif error_msg:
         session["csrf_error"] = error_msg
 

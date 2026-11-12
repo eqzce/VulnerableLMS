@@ -37,6 +37,10 @@ CADDYFILE_PATH = os.path.join(BASE_DIR, "Caddyfile")
 CORAZA_RULES_PATH = os.path.join(BASE_DIR, "coraza_rules.conf")
 CORAZA_AUDIT_LOG = os.path.join(BASE_DIR, "coraza_audit.log")
 
+CRS_DIR = os.path.join(BASE_DIR, "owasp-crs")
+CRS_RULES_DIR = os.path.join(CRS_DIR, "rules")
+CRS_SETUP_CONF = os.path.join(CRS_DIR, "crs-setup.conf")
+
 PUBLIC_WAF_PORT = 5001
 INTERNAL_FLASK_PORT = 5002
 
@@ -278,132 +282,7 @@ def init_db():
 
     c.execute("DELETE FROM waf_rules")
     default_rules = [
-        # --- SECTION 942: SQL INJECTION (SQLi) ---
-        (
-            1001,
-            "WAF-SQLI-BASIC",
-            "SQLi",
-            1,
-            "ARGS",
-            r"(?i)(union\s+select|or\s+['\x22]?\d+['\x22]?\s*=\s*['\x22]?\d+|/\*\*/\s*or\s*/\*\*/|'and'1'='1|drop\s+table|--)",
-            "OWASP CRS 942: Blocks standard Low/Medium/High SQLi (' OR 1=1 --, /**/OR/**/, 'AND'1'='1).",
-            "CRITICAL",
-            1,
-        ),
-        (
-            1011,
-            "WAF-SQLI-STACKED-QUERIES",
-            "SQLi",
-            1,
-            "ARGS",
-            r"(?i);\s*(insert|update|delete|drop|alter|create|truncate)\s+",
-            "OWASP CRS 942: Detects stacked SQL queries attempting database modification or dropping tables.",
-            "CRITICAL",
-            1,
-        ),
-        (
-            1012,
-            "WAF-SQLI-METADATA-PROBING",
-            "SQLi",
-            1,
-            "ARGS",
-            r"(?i)\b(information_schema|sqlite_master|sqlite_temp_master|pg_tables|sys\.databases)\b",
-            "OWASP CRS 942: Detects database schema enumeration and metadata probing.",
-            "HIGH",
-            1,
-        ),
-        (
-            2001,
-            "WAF-SQLI-BYPASS",
-            "SQLi",
-            2,
-            "ARGS",
-            r"(?i)(/\*.*\*/|'\s*(or|and)\s*'[a-z0-9]+'\s*=\s*'|['\x22]\s*(or|and)\s*\d+\s*=\s*\d+|--|;\s*(drop|select|insert|update))",
-            "OWASP CRS 942 (L2): Catches alpha quote-delimited SQLi bypasses (admin'AND'a'='a) and comment fragmentation.",
-            "CRITICAL",
-            1,
-        ),
-        (
-            2011,
-            "WAF-SQLI-BLIND-FUNCTIONS",
-            "SQLi",
-            2,
-            "ARGS",
-            r"(?i)\b(sleep\s*\(|benchmark\s*\(|waitfor\s+delay|pg_sleep\s*\()",
-            "OWASP CRS 942 (L2): Blocks time-based blind SQL injection functions.",
-            "HIGH",
-            1,
-        ),
-        (
-            2012,
-            "WAF-SQLI-OUTFILE-INJECTION",
-            "SQLi",
-            2,
-            "ARGS",
-            r"(?i)\b(extractvalue|updatexml|load_file|into\s+outfile|into\s+dumpfile)\b",
-            "OWASP CRS 942 (L2): Detects error-based extraction and arbitrary file read/write SQL clauses.",
-            "CRITICAL",
-            1,
-        ),
-
-        # --- SECTION 941: CROSS-SITE SCRIPTING (XSS) ---
-        (
-            1002,
-            "WAF-XSS-BASIC",
-            "XSS",
-            1,
-            "ARGS",
-            r"(?i)(<\s*script\b|javascript\s*:|<\s*iframe\b|<\s*object\b|<\s*embed\b|<\s*img\b|\bonerror\s*=|<\s*details\b|\bontoggle\s*=)",
-            "OWASP CRS 941: Blocks standard Low/Medium/High XSS (<script>, <img onerror>, <details ontoggle>).",
-            "CRITICAL",
-            1,
-        ),
-        (
-            1021,
-            "WAF-XSS-DATA-SCHEME",
-            "XSS",
-            1,
-            "ARGS",
-            r"(?i)data:text/(html|javascript)",
-            "OWASP CRS 941: Blocks malicious payload delivery via data: URI scheme.",
-            "HIGH",
-            1,
-        ),
-        (
-            1022,
-            "WAF-XSS-STYLE-EXPRESSION",
-            "XSS",
-            1,
-            "ARGS",
-            r"(?i)(style\s*=.*expression\s*\(|vbscript\s*:)",
-            "OWASP CRS 941: Blocks CSS expression execution and active scripting protocols.",
-            "HIGH",
-            1,
-        ),
-        (
-            2002,
-            "WAF-XSS-BYPASS",
-            "XSS",
-            2,
-            "ARGS",
-            r"(?i)(\bon[a-z]+\s*=|<\s*(svg|img|body|details|input|video|audio|marquee|object|embed)\b)",
-            "OWASP CRS 941 (L2): Catches all DOM event handlers (onfocus=, onerror=, ontoggle=) and HTML5 tags.",
-            "CRITICAL",
-            1,
-        ),
-        (
-            2021,
-            "WAF-XSS-AUTOFOCUS-FOCUS",
-            "XSS",
-            2,
-            "ARGS",
-            r"(?i)(autofocus|onfocus|onload|onmouseover|onpointerenter)\s*=",
-            "OWASP CRS 941 (L2): Blocks modern zero-click DOM autofocus/onfocus evasion vectors.",
-            "HIGH",
-            1,
-        ),
-
-        # --- SECTION 943: BROKEN ACCESS CONTROL & PRIVILEGE ESCALATION ---
+        # --- UNIVERSITY LAB VIRTUAL PATCH: MODULE 3 (BURP VAULT & PARAMETER TAMPERING) ---
         (
             1003,
             "WAF-BAC-BASIC",
@@ -411,7 +290,7 @@ def init_db():
             1,
             "ARGS:is_admin|REQUEST_COOKIES:user_role|REQUEST_COOKIES:auth_token|REQUEST_COOKIES:vault_sig|REQUEST_HEADERS:X-Forwarded-For|REQUEST_HEADERS:X-Original-URL|ARGS:sim_exploit",
             r"(^(true|TRUE|admin|ADMIN|low|medium|high)$|dXNlcj1hZG1pbg==|127\.0\.0\.1|/admin/vault|52c876f2a69205692536a1f2857b4e4c70312142b068e23f4d87d506680183c5)",
-            "OWASP CRS 943: Blocks standard Burp tampering (is_admin=true, user_role=admin, dXNlcj1hZG1pbg==, 127.0.0.1).",
+            "University Virtual Patch (L1): Blocks Burp parameter tampering (is_admin=true, user_role=admin, Base64 token dXNlcj1hZG1pbg==).",
             "CRITICAL",
             1,
         ),
@@ -422,7 +301,7 @@ def init_db():
             1,
             "ARGS|REQUEST_COOKIES",
             r"(?i)\b(role=(root|superuser|administrator)|admin=1|is_staff=true|is_dean=true)\b",
-            "OWASP CRS 943: Blocks direct parameter tampering attempting administrative privilege escalation.",
+            "University Virtual Patch (L1): Blocks direct parameter tampering attempting administrative privilege escalation.",
             "HIGH",
             1,
         ),
@@ -433,7 +312,7 @@ def init_db():
             2,
             "REQUEST_COOKIES:auth_token|REQUEST_COOKIES:vault_sig|REQUEST_HEADERS:X-Forwarded-For|REQUEST_HEADERS:X-Original-URL|ARGS:sim_exploit",
             r"(?i)(dXNlcj1hZG1pbg==|dXNlcj1BRE1JTg==|localhost|127\.0\.0\.1|/admin|52c876f2a69205692536a1f2857b4e4c70312142b068e23f4d87d506680183c5|^bypass$)",
-            "OWASP CRS 943 (L2): Catches uppercase Base64 token (dXNlcj1BRE1JTg==) and X-Forwarded-For: localhost WAF bypass.",
+            "University Virtual Patch (L2): Deep inspection of uppercase Base64 token (dXNlcj1BRE1JTg==) and X-Forwarded-For bypass.",
             "CRITICAL",
             1,
         ),
@@ -444,256 +323,44 @@ def init_db():
             2,
             "REQUEST_HEADERS:X-Real-IP|REQUEST_HEADERS:X-Originating-IP|REQUEST_HEADERS:Client-IP",
             r"(?i)(127\.0\.0\.1|localhost|0\.0\.0\.0|::1)",
-            "OWASP CRS 943 (L2): Detects spoofing of internal loopback origin in secondary proxy headers.",
+            "University Virtual Patch (L2): Detects spoofing of internal loopback origin in secondary proxy headers.",
             "HIGH",
             1,
         ),
 
-        # --- SECTION 913: SCANNER & AUTOMATED ATTACK TOOL DETECTION ---
+        # --- UNIVERSITY LAB VIRTUAL PATCH: MODULE 7 (FORCED BROWSING & HIDDEN CONSOLES) ---
         (
-            913100,
-            "WAF-SCANNER-USERAGENT",
-            "Scanner Detection",
+            1030,
+            "WAF-FORCED-BROWSING-ADMIN",
+            "Forced Browsing / URL Access",
             1,
-            "REQUEST_HEADERS:User-Agent",
-            r"(?i)(sqlmap|nikto|acunetix|dirbuster|gobuster|wpscan|havij|nessus|masscan|zgrab|openvas|arachni)",
-            "OWASP CRS 913: Detects automated vulnerability scanners and web application security testing bots.",
-            "HIGH",
-            1,
-        ),
-        (
-            913110,
-            "WAF-SCANNER-VULN-PROBES",
-            "Scanner Detection",
-            1,
-            "ARGS|REQUEST_URI",
-            r"(?i)(acunetix_wvs|nessus_token|appscan_probe|openvas_scan)",
-            "OWASP CRS 913: Blocks probe signatures and canary tokens generated by commercial DAST scanners.",
-            "MEDIUM",
-            1,
-        ),
-
-        # --- SECTION 920 & 921: PROTOCOL ATTACKS & REQUEST TAMPERING ---
-        (
-            920100,
-            "WAF-PROTOCOL-INVALID-METHOD",
-            "Protocol Enforcement",
-            1,
-            "REQUEST_METHOD",
-            r"(?i)^(PUT|DELETE|CONNECT|TRACE|TRACK)$",
-            "OWASP CRS 920: Blocks dangerous HTTP methods disallowed by portal security policy.",
-            "MEDIUM",
-            1,
-        ),
-        (
-            921110,
-            "WAF-PROTOCOL-HTTP-SPLITTING",
-            "Protocol Enforcement",
-            1,
-            "ARGS|REQUEST_HEADERS",
-            r"(?i)(%0d%0a|\r\n)(set-cookie|location|content-type):",
-            "OWASP CRS 921: Blocks HTTP Response Splitting and header CRLF injection attacks.",
-            "HIGH",
-            1,
-        ),
-
-        # --- SECTION 930 & 931: PATH TRAVERSAL / LFI & RFI ---
-        (
-            930100,
-            "WAF-LFI-PATH-TRAVERSAL",
-            "LFI / Path Traversal",
-            1,
-            "ARGS|REQUEST_URI",
-            r"(?i)(\.\./|\.\.\\|/etc/passwd|/etc/shadow|c:\\windows|c:/windows|boot\.ini|win\.ini|secret_exam_key)",
-            "OWASP CRS 930: Blocks directory traversal attempts accessing system configuration or SAM files.",
+            "REQUEST_URI",
+            r"(?i)(/admin-console|/secret-backup|/admin_panel|/faculty-console)",
+            "University Virtual Patch (L1): Blocks direct URL forced browsing to Dean's administrative consoles and backups.",
             "CRITICAL",
             1,
         ),
         (
-            930110,
-            "WAF-LFI-NULL-BYTE",
-            "LFI / Path Traversal",
-            1,
-            "ARGS|REQUEST_URI",
-            r"(?i)(%00|\\x00|%2500)",
-            "OWASP CRS 930: Blocks null byte poison injection used to bypass file extension filters.",
-            "HIGH",
-            1,
-        ),
-        (
-            930120,
-            "WAF-LFI-SENSITIVE-FILES",
-            "LFI / Path Traversal",
-            1,
-            "ARGS:doc|REQUEST_URI",
-            r"(?i)(secret_exam_key|credentials|\.env|\.git)",
-            "OWASP CRS 930120: Access to restricted sensitive examination keys, configuration files, and secrets.",
-            "CRITICAL",
-            1,
-        ),
-        (
-            293010,
-            "WAF-LFI-BYPASS",
-            "LFI / Path Traversal",
+            2030,
+            "WAF-URL-PATH-TRAVERSAL-BYPASS",
+            "Forced Browsing / URL Access",
             2,
-            "ARGS:doc|REQUEST_URI",
-            r"(?i)(\.\.|%2e%2e|%2f|%5c|\.\.//|\.\.\\\\)",
-            "OWASP CRS 930 (L2): Deep inspection of encoded traversal (%2f, %5c) and nested sequences (....//).",
-            "CRITICAL",
-            1,
-        ),
-        (
-            931100,
-            "WAF-RFI-REMOTE-INCLUDE",
-            "RFI",
-            1,
-            "ARGS",
-            r"(?i)(https?|ftp|file)://",
-            "OWASP CRS 931: Blocks remote file inclusion loading payloads from external hosts.",
-            "CRITICAL",
-            1,
-        ),
-        (
-            931110,
-            "WAF-PHP-STREAM-WRAPPERS",
-            "RFI",
-            1,
-            "ARGS",
-            r"(?i)php://(input|filter|memory|temp)",
-            "OWASP CRS 931: Blocks dangerous PHP I/O stream wrappers used in pseudo-protocol exploits.",
-            "HIGH",
-            1,
-        ),
-
-        # --- SECTION 932: REMOTE COMMAND EXECUTION (RCE) ---
-        (
-            932100,
-            "WAF-RCE-SHELL-BINARIES",
-            "RCE",
-            1,
-            "ARGS",
-            r"(?i)(/bin/(bash|sh|zsh|dash)|/usr/bin/id|/usr/bin/whoami|cmd\.exe|powershell(\.exe)?|nc\s+-e)",
-            "OWASP CRS 932: Blocks invocation of core OS shell interpreters and interactive netcat listeners.",
-            "CRITICAL",
-            1,
-        ),
-        (
-            932110,
-            "WAF-RCE-WINDOWS-LOLBINS",
-            "RCE",
-            1,
-            "ARGS",
-            r"(?i)\b(certutil|bitsadmin|vssadmin|wmic|curl\s+.*\|\s*sh|wget\s+.*\|\s*sh)\b",
-            "OWASP CRS 932: Detects Living-off-the-Land (LOLBins) binaries and pipe-to-shell downloaders.",
-            "HIGH",
-            1,
-        ),
-        (
-            932150,
-            "WAF-RCE-COMMAND-CHAINING",
-            "RCE",
-            2,
-            "ARGS",
-            r"(?i)(;\s*(cat|ls|dir|whoami|id|echo|curl|wget)\b|\|\s*(cat|grep|whoami|bash)\b)",
-            "OWASP CRS 932 (L2): Detects shell command chaining operators (; | && ||) executing system utilities.",
+            "REQUEST_URI",
+            r"(?i)(%2e%2e|/\.\./|/public/\.\./|/faculty/\.\./|admin-console;|admin-console%00|%61dmin-console)",
+            "University Virtual Patch (L2): Inspects URL-encoding and directory traversal targeting Dean's console.",
             "CRITICAL",
             1,
         ),
 
-        # --- SECTION 933: CODE INJECTION & SERVER-SIDE TEMPLATES (SSTI) ---
+        # --- UNIVERSITY LAB VIRTUAL PATCH: MODULE 7 (IDOR - STUDENT DOSSIERS) ---
         (
-            933100,
-            "WAF-PHP-CODE-EXECUTION",
-            "Code Injection",
-            1,
-            "ARGS",
-            r"(?i)(<\?php|\b(eval|assert|passthru|shell_exec|proc_open)\s*\()",
-            "OWASP CRS 933: Detects arbitrary PHP code tags and dangerous dynamic execution primitives.",
-            "CRITICAL",
-            1,
-        ),
-        (
-            933150,
-            "WAF-SSTI-TEMPLATE-INJECTION",
-            "Code Injection",
-            1,
-            "ARGS",
-            r"(?i)(\{\{.*(config|self|import|builtins|request|class).*\}\}|\$\{.*(Runtime|ProcessBuilder).*\})",
-            "OWASP CRS 933: Blocks Server-Side Template Injection (Jinja2, Twig, Spring EL expression breakouts).",
-            "CRITICAL",
-            1,
-        ),
-
-        # --- SECTION 944: JAVA DESERIALIZATION & LOG4SHELL ---
-        (
-            944100,
-            "WAF-LOG4J-JNDI-INJECTION",
-            "Deserialization / RCE",
-            1,
-            "ARGS|REQUEST_HEADERS",
-            r"(?i)jndi:(ldap|rmi|dns|corba|iiop|nis)",
-            "OWASP CRS 944: Blocks Log4Shell (CVE-2021-44228) and JNDI LDAP/RMI lookup strings.",
-            "CRITICAL",
-            1,
-        ),
-        (
-            944110,
-            "WAF-JAVA-DESERIALIZATION",
-            "Deserialization / RCE",
-            1,
-            "ARGS|REQUEST_COOKIES",
-            r"(?i)(rO0ABX|aced0005)",
-            "OWASP CRS 944: Blocks Java serialized object magic headers (ysoserial gadget payloads).",
-            "HIGH",
-            1,
-        ),
-
-        # --- SECTION 950: SENSITIVE DATA LEAKAGE & DEBUG PARAMS ---
-        (
-            950100,
-            "WAF-LEAK-DEBUG-ENDPOINTS",
-            "Information Leak",
-            1,
-            "ARGS|REQUEST_URI",
-            r"(?i)\b(phpinfo|xdebug|actuator/(health|env)|dump_env|trace\.axd|elmah\.axd)\b",
-            "OWASP CRS 950: Blocks access to framework debug probes, metrics actuators, and stack traces.",
-            "MEDIUM",
-            1,
-        ),
-
-        # --- SECTION 934: SERVER-SIDE REQUEST FORGERY (SSRF) ---
-        (
-            934100,
-            "WAF-SSRF-LOOPBACK",
-            "SSRF",
-            1,
-            "ARGS:url|ARGS:target|REQUEST_URI",
-            r"(?i)(127\.0\.0\.1|localhost|0\.0\.0\.0|169\.254\.169\.254|metadata\.google\.internal)",
-            "OWASP CRS 934: Blocks Server-Side Request Forgery targeting loopback and cloud metadata.",
-            "CRITICAL",
-            1,
-        ),
-        (
-            2034,
-            "WAF-SSRF-BYPASS",
-            "SSRF",
-            2,
-            "ARGS:url|ARGS:target|REQUEST_URI",
-            r"(?i)(2130706433|0x7f000001|\[::1\]|0177\.0\.0\.1|::1)",
-            "OWASP CRS 934 (L2): Deep inspection of alternative numeric, hex, and IPv6 loopback encodings.",
-            "CRITICAL",
-            1,
-        ),
-
-        # --- SECTION 943: INSECURE DIRECT OBJECT REFERENCES (IDOR / BOLA) ---
-        (
-            943200,
+            1043,
             "WAF-IDOR-NUMERIC-OBJECT",
             "IDOR",
             1,
             "ARGS:student_id|REQUEST_URI",
             r"(?i)(\bstudent_id=1\b|^1$)",
-            "OWASP CRS 943: Direct Object Reference (IDOR) - unauthorized access attempt to Provost/Dean master record #1.",
+            "University Virtual Patch (L1): Protects Dean's confidential dossier record #1 from unauthorized direct access.",
             "CRITICAL",
             1,
         ),
@@ -704,44 +371,20 @@ def init_db():
             2,
             "ARGS:student_id|REQUEST_URI",
             r"(?i)(MQ==|MQ%3D%3D|MQ%3d%3d|c4ca4238a0b923820dcc509a6f75849b|\bstudent_id=01\b|^01$)",
-            "OWASP CRS 943 (L2): Deep inspection of encoded Base64 (MQ==), MD5 hashed or zero-padded direct object references.",
+            "University Virtual Patch (L2): Deep inspection of encoded Base64 (MQ==), MD5 hashed or zero-padded direct references.",
             "CRITICAL",
             1,
         ),
 
-        # --- SECTION 930: FORCED BROWSING & UNRESTRICTED URL ACCESS ---
+        # --- UNIVERSITY LAB VIRTUAL PATCH: MODULE 8 (CSRF PROFILE HIJACK) ---
         (
-            930130,
-            "WAF-FORCED-BROWSING-ADMIN",
-            "Forced Browsing / URL Access",
-            1,
-            "REQUEST_URI",
-            r"(?i)(/admin-console|/secret-backup|/admin_panel|/faculty-console)",
-            "OWASP CRS 930: Blocks forced browsing and direct URL access to restricted administrative consoles and faculty endpoints.",
-            "CRITICAL",
-            1,
-        ),
-        (
-            293013,
-            "WAF-URL-PATH-TRAVERSAL-BYPASS",
-            "Forced Browsing / URL Access",
-            2,
-            "REQUEST_URI",
-            r"(?i)(%2e%2e|/\.\./|/public/\.\./|/faculty/\.\./|admin-console;|admin-console%00|%61dmin-console)",
-            "OWASP CRS 930 (L2): Deep inspection of URL path traversal and dot-segment evasion (/../, %2e%2e, matrix semicolons) targeting administrative consoles.",
-            "CRITICAL",
-            1,
-        ),
-
-        # --- SECTION 949: CROSS-SITE REQUEST FORGERY (CSRF) ---
-        (
-            949100,
+            1049,
             "WAF-CSRF-ANOMALOUS-ORIGIN",
             "CSRF",
             2,
             "REQUEST_HEADERS:Referer|ARGS:email",
             r"(?i)(attacker\.com|evil\.com)",
-            "OWASP CRS 949 (L2): Detects anomalous cross-origin referrers and known attacker domains in state-changing parameters.",
+            "University Virtual Patch (L2): Detects anomalous cross-origin referrers and known attacker domains in state-changing parameters.",
             "HIGH",
             1,
         ),
@@ -762,8 +405,43 @@ def init_db():
 # ==============================================================================
 # OWASP CORAZA WAF (REAL REVERSE-PROXY WAF ENGINE MANAGEMENT)
 # ==============================================================================
+def ensure_owasp_crs():
+    """Verifies that the official OWASP Core Rule Set (CRS v4.10.0) is present and ready."""
+    crs_rules = os.path.join(BASE_DIR, "owasp-crs", "rules")
+    crs_setup = os.path.join(BASE_DIR, "owasp-crs", "crs-setup.conf")
+    crs_example = os.path.join(BASE_DIR, "owasp-crs", "crs-setup.conf.example")
+
+    if not os.path.exists(crs_rules) or not os.path.exists(crs_setup):
+        if os.path.exists(crs_example) and not os.path.exists(crs_setup):
+            import shutil
+            shutil.copyfile(crs_example, crs_setup)
+        else:
+            print("[*] Fetching official OWASP Core Rule Set (CRS v4.10.0)...")
+            try:
+                subprocess.run(
+                    [
+                        "git",
+                        "clone",
+                        "--depth",
+                        "1",
+                        "--branch",
+                        "v4.10.0",
+                        "https://github.com/coreruleset/coreruleset.git",
+                        os.path.join(BASE_DIR, "owasp-crs"),
+                    ],
+                    check=True,
+                )
+                if os.path.exists(crs_example) and not os.path.exists(crs_setup):
+                    import shutil
+                    shutil.copyfile(crs_example, crs_setup)
+                print("[+] OWASP Core Rule Set (CRS v4.10.0) downloaded successfully.")
+            except Exception as e:
+                print(f"[!] Warning: could not download OWASP CRS: {e}")
+
+
 def write_coraza_config_files():
     """Generates real ModSecurity/Coraza SecRule directives in coraza_rules.conf and Caddyfile."""
+    ensure_owasp_crs()
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     rows = conn.execute("SELECT key, value FROM settings").fetchall()
@@ -786,19 +464,32 @@ def write_coraza_config_files():
 
     secrules_lines = [
         "# ======================================================================",
-        "# OWASP CORAZA WAF — MODSECURITY SECLANG CONFIGURATION (AUTO-GENERATED)",
+        "# OWASP CORAZA WAF — OFFICIAL CORE RULE SET (CRS v4.10.0) CONFIGURATION",
         f"# Active Mode: SecRuleEngine {engine_state} | Active Paranoia Level: L{paranoia}",
         "# ======================================================================",
         f"SecRuleEngine {engine_state}",
         "SecRequestBodyAccess On",
-        "SecAuditEngine Off",
+        "SecResponseBodyAccess On",
+        "SecAuditEngine RelevantOnly",
         "SecAuditLogParts ABIJDEFHZ",
         "SecAuditLogType Serial",
         "SecAuditLogFormat JSON",
         "SecAuditLog ./coraza_audit.log",
         "",
-        "# Whitelist WAF Admin Dashboard, Hints & Settings endpoints",
-        'SecRule REQUEST_URI "@rx ^/(waf-dashboard|waf/|settings/|hints|coraza-blocked)" "id:999,phase:1,pass,nolog,ctl:ruleEngine=Off"',
+        "# 1. Whitelist WAF Admin Dashboard, Hints, Settings & Blocked endpoints",
+        'SecRule REQUEST_URI "@rx ^/(waf-dashboard|waf/|settings/|hints|coraza-blocked|static/)" "id:999,phase:1,pass,nolog,ctl:ruleEngine=Off"',
+        "",
+        "# 2. Local Lab Compatibility: Allow connecting via IP address 127.0.0.1 (disables rule 920350)",
+        "SecRuleRemoveById 920350",
+        "",
+        "# 3. Configure Dynamic Paranoia Level for OWASP CRS",
+        f'SecAction "id:900000,phase:1,pass,t:none,nolog,tag:\'OWASP_CRS\',ver:\'OWASP_CRS/4.10.0\',setvar:tx.blocking_paranoia_level={paranoia}"',
+        "",
+        "# 4. Include Official OWASP ModSecurity Core Rule Set (CRS v4.10.0)",
+        "Include ./owasp-crs/crs-setup.conf",
+        "Include ./owasp-crs/rules/*.conf",
+        "",
+        "# 5. University Virtual Patching Rules (Business Logic Protection)",
         "# Only evaluate Access Control cookie/header rules on POST requests so GET page loads are never locked out by stale cookies",
         'SecRule REQUEST_METHOD "@streq GET" "id:998,phase:1,pass,nolog,ctl:ruleRemoveById=1003,ctl:ruleRemoveById=1031,ctl:ruleRemoveById=2003,ctl:ruleRemoveById=2031"',
         "",
@@ -849,7 +540,7 @@ def write_coraza_config_files():
     }}
 }}
 """
-    with open(CADDYFILE_PATH, "w", encoding="utf-8") as f:
+    with open(CADDYFILE_PATH, "w", encoding="utf-8", newline="\r\n") as f:
         f.write(caddyfile_content)
 
 
@@ -890,6 +581,7 @@ def sync_coraza_waf(reload_live=True):
 def start_coraza_reverse_proxy():
     """Starts the standalone OWASP Coraza WAF + Caddy reverse proxy on port 5001."""
     global coraza_process
+    ensure_owasp_crs()
     if not os.path.exists(CORAZA_EXE):
         print(f"[*] {CORAZA_EXE} not found. Downloading official OWASP Coraza WAF binary...")
         try:
@@ -951,16 +643,45 @@ def parse_coraza_audit_logs(limit=100):
                 if not msgs:
                     continue
 
-                first_msg = msgs[-1]
-                err_str = first_msg.get("error_message", "")
+                attack_msg = None
+                for m in msgs:
+                    err = m.get("error_message", "")
+                    if "949110" not in err and "920350" not in err and '[id "' in err:
+                        attack_msg = m
+                        break
+                if not attack_msg:
+                    attack_msg = msgs[-1]
 
+                err_str = attack_msg.get("error_message", "")
                 rule_id_match = re.search(r'\[msg "(.*?)"\]', err_str)
                 sec_id_match = re.search(r'\[id "(.*?)"\]', err_str)
                 tag_match = re.search(r'\[tag "(.*?)"\]', err_str)
+                file_match = re.search(r'\[file "(.*?)"\]', err_str)
 
-                rule_name = rule_id_match.group(1) if rule_id_match else "CORAZA-RULE"
+                rule_name = rule_id_match.group(1) if rule_id_match else "OWASP-CRS-RULE"
                 sec_id = sec_id_match.group(1) if sec_id_match else "1000"
-                category = tag_match.group(1) if tag_match else "WAF"
+                file_name = os.path.basename(file_match.group(1)) if file_match else ""
+
+                category = "WAF"
+                err_lower = err_str.lower()
+                if "sqli" in err_lower or "sql injection" in err_lower:
+                    category = "SQLi"
+                elif "xss" in err_lower:
+                    category = "XSS"
+                elif "rce" in err_lower or "command execution" in err_lower:
+                    category = "RCE"
+                elif "lfi" in err_lower or "path traversal" in err_lower:
+                    category = "LFI / Traversal"
+                elif "ssrf" in err_lower:
+                    category = "SSRF"
+                elif "access control" in err_lower or "bac" in err_lower:
+                    category = "Access Control"
+                elif "scanner" in err_lower:
+                    category = "Scanner Detection"
+                elif "protocol" in err_lower:
+                    category = "Protocol Enforcement"
+                elif tag_match:
+                    category = tag_match.group(1)
 
                 is_blocked = tx.get("is_interrupted", False) or "Access denied" in err_str
                 action_taken = (
@@ -977,6 +698,10 @@ def parse_coraza_audit_logs(limit=100):
 
                 matched_payload = f"{uri} {body} {cookie_hdr}".strip()
 
+                display_rule = f"{rule_name} (id:{sec_id})"
+                if file_name:
+                    display_rule += f" [{file_name}]"
+
                 parsed_logs.append(
                     {
                         "tx_id": tx.get("id", "N/A"),
@@ -984,7 +709,7 @@ def parse_coraza_audit_logs(limit=100):
                         "ip_address": tx.get("client_ip", "127.0.0.1"),
                         "http_method": req.get("method", "GET"),
                         "endpoint": uri.split("?")[0],
-                        "rule_id": f"{rule_name} (id:{sec_id})",
+                        "rule_id": display_rule,
                         "category": category,
                         "severity": "CRITICAL",
                         "matched_payload": matched_payload[:280],
@@ -1000,6 +725,63 @@ def parse_coraza_audit_logs(limit=100):
         pass
 
     return parsed_logs
+
+
+def get_owasp_crs_modules():
+    """Returns a list of all official OWASP CRS rule files, their titles, rule counts and sizes."""
+    if not os.path.exists(CRS_RULES_DIR):
+        return []
+    modules = []
+    category_titles = {
+        "901": "Initialization & Environment Setup",
+        "905": "Common Application Exceptions",
+        "911": "HTTP Method Enforcement",
+        "913": "Scanner & Automated Bot Detection",
+        "920": "HTTP Protocol Enforcement",
+        "921": "HTTP Protocol Attack & Splitting",
+        "922": "Multipart Attack Detection",
+        "930": "Local File Inclusion (LFI) & Path Traversal",
+        "931": "Remote File Inclusion (RFI)",
+        "932": "Remote Code Execution (RCE)",
+        "933": "PHP Code Injection Protection",
+        "934": "NodeJS / Generic Code Injection",
+        "941": "Cross-Site Scripting (XSS) Protection",
+        "942": "SQL Injection (SQLi) Protection",
+        "943": "Session Fixation & Broken Access Control",
+        "944": "Java & Log4j / JNDI Deserialization",
+        "949": "Inbound Anomaly Scoring & Blocking Evaluation",
+        "950": "Outbound Sensitive Data Leakage",
+        "951": "SQL Error & Source Code Leakage",
+        "952": "Java Error & Stack Trace Leakage",
+        "953": "PHP Information Leakage",
+        "954": "IIS Server Error Leakage",
+        "955": "Web Shell & Backdoor Detection",
+        "959": "Outbound Anomaly Scoring Evaluation",
+        "980": "Correlation & Threat Scoring",
+    }
+    for fname in sorted(os.listdir(CRS_RULES_DIR)):
+        if fname.endswith(".conf"):
+            full_path = os.path.join(CRS_RULES_DIR, fname)
+            size_kb = round(os.path.getsize(full_path) / 1024, 1)
+            rule_count = 0
+            try:
+                with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        if line.strip().startswith("SecRule "):
+                            rule_count += 1
+            except Exception:
+                pass
+            match = re.search(r"-(\d{3})-", fname)
+            code = match.group(1) if match else ""
+            title = category_titles.get(code, "OWASP Core Rule Set Module")
+            modules.append({
+                "filename": fname,
+                "title": title,
+                "code": code,
+                "rules_count": rule_count,
+                "size_kb": size_kb,
+            })
+    return modules
 
 
 def get_settings():
@@ -2271,6 +2053,8 @@ def waf_dashboard():
         "SELECT * FROM waf_rules ORDER BY paranoia_level ASC, secrule_id ASC"
     ).fetchall()
     logs = parse_coraza_audit_logs(limit=100)
+    crs_modules = get_owasp_crs_modules()
+    total_crs_rules = sum(m["rules_count"] for m in crs_modules)
     coraza_conf_text = ""
     if os.path.exists(CORAZA_RULES_PATH):
         with open(CORAZA_RULES_PATH, "r", encoding="utf-8") as f:
@@ -2279,8 +2063,23 @@ def waf_dashboard():
         "waf_dashboard.html",
         rules=rules,
         logs=logs,
+        crs_modules=crs_modules,
+        total_crs_rules=total_crs_rules,
         coraza_conf_text=coraza_conf_text,
     )
+
+
+@app.route("/waf/crs/view/<filename>")
+def view_crs_file(filename):
+    safe_name = os.path.basename(filename)
+    file_path = os.path.join(CRS_RULES_DIR, safe_name)
+    if not os.path.exists(file_path):
+        file_path = os.path.join(CRS_DIR, safe_name)
+    content = ""
+    if os.path.exists(file_path):
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            content = f.read()
+    return render_template("waf_rule_viewer.html", filename=safe_name, content=content)
 
 
 @app.route("/waf/rules/toggle/<int:rule_pk>", methods=["POST"])

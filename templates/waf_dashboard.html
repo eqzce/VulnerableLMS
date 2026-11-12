@@ -1,119 +1,209 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm flex flex-wrap items-center justify-between gap-4">
-    <div>
-        <div class="text-xs font-semibold uppercase tracking-wider text-emerald-600">STANDALONE REVERSE-PROXY WAF ENGINE (:5001 -> :5002)</div>
-        <h1 class="text-xl font-bold text-slate-900 mt-1">🛡️ OWASP Coraza WAF — ModSecurity SecRule & Audit Console</h1>
-        <p class="text-sm text-slate-600 mt-0.5">
-            Live telemetry from <code class="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded">coraza-waf.exe</code> (Caddy v2.11 + <code class="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded">http.handlers.waf</code>) and real-time <code class="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded">coraza_audit.log</code> JSON events.
-        </p>
+<div class="space-y-6">
+    <!-- Header Banner -->
+    <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm flex flex-wrap items-center justify-between gap-4">
+        <div>
+            <div class="flex items-center gap-2">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    ONLINE REVERSE PROXY
+                </span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                    OWASP CRS v4.10.0
+                </span>
+                <span class="text-xs font-semibold text-slate-500 font-mono">:5001 (WAF) ➔ :5002 (Flask)</span>
+            </div>
+            <h1 class="text-xl font-bold text-slate-900 mt-1">🛡️ OWASP Coraza WAF & Core Rule Set (CRS) Console</h1>
+            <p class="text-sm text-slate-600 mt-0.5">
+                Full-featured enterprise Web Application Firewall running as a standalone Caddy v2 reverse proxy with native <code class="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded">http.handlers.waf</code>.
+            </p>
+        </div>
+        <div class="flex items-center gap-2">
+            <form action="{{ url_for('clear_waf_logs') }}" method="POST">
+                <button type="submit" class="px-3.5 py-2 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-semibold text-xs transition">
+                    🗑️ Clear Audit Log
+                </button>
+            </form>
+        </div>
     </div>
-    <form action="{{ url_for('clear_waf_logs') }}" method="POST">
-        <button type="submit" class="px-4 py-2 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-semibold text-xs transition">
-            🗑️ Clear coraza_audit.log
-        </button>
-    </form>
-</div>
 
-<!-- Add Custom SecRule -->
-<div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
-    <h2 class="text-sm font-bold text-slate-900">➕ Add Custom ModSecurity / Coraza SecRule Signature</h2>
-    <form action="{{ url_for('add_waf_rule') }}" method="POST" class="grid grid-cols-1 sm:grid-cols-6 gap-3 text-xs">
-        <input type="text" name="rule_id" placeholder="WAF-CUSTOM-01" required class="px-3 py-2 rounded-lg bg-white border border-slate-300 font-mono">
-        <input type="text" name="category" placeholder="SQLi / XSS / BAC" required class="px-3 py-2 rounded-lg bg-white border border-slate-300 font-mono">
-        <select name="paranoia_level" class="px-3 py-2 rounded-lg bg-white border border-slate-300 font-mono">
-            <option value="1">Paranoia L1</option>
-            <option value="2">Paranoia L2</option>
-        </select>
-        <input type="text" name="pattern" placeholder="@rx regex pattern..." required class="sm:col-span-2 px-3 py-2 rounded-lg bg-white border border-slate-300 font-mono">
-        <input type="hidden" name="description" value="User-defined custom Coraza SecRule">
-        <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition">Add & Reload Coraza</button>
-    </form>
-</div>
-
-<!-- Live Coraza Audit Logs -->
-<div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
-    <h2 class="text-sm font-bold text-slate-900">Live OWASP Coraza Audit Log (<code class="font-mono text-xs text-blue-600">coraza_audit.log</code>)</h2>
-    {% if logs %}
-    <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse text-xs font-mono">
-            <thead>
-                <tr class="border-b border-slate-200 bg-slate-50 text-slate-500 uppercase">
-                    <th class="py-2.5 px-3">Timestamp</th>
-                    <th class="py-2.5 px-3">Coraza TX ID</th>
-                    <th class="py-2.5 px-3">Triggered SecRule</th>
-                    <th class="py-2.5 px-3">Request URI / Headers</th>
-                    <th class="py-2.5 px-3">Verdict</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-200">
-                {% for log in logs %}
-                <tr>
-                    <td class="py-2.5 px-3 text-slate-500">{{ log.timestamp }}</td>
-                    <td class="py-2.5 px-3 text-purple-700 font-semibold">{{ log.tx_id }}</td>
-                    <td class="py-2.5 px-3 font-bold text-slate-800">{{ log.rule_id }}</td>
-                    <td class="py-2.5 px-3 text-slate-700 break-all">{{ log.http_method }} {{ log.matched_payload }}</td>
-                    <td class="py-2.5 px-3">
-                        <span class="px-2 py-0.5 rounded text-[10px] font-bold {{ 'bg-rose-100 text-rose-800' if 'BLOCKED' in log.action_taken else 'bg-amber-100 text-amber-800' }}">
-                            {{ log.action_taken }}
-                        </span>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <!-- Official OWASP CRS Architecture Stats -->
+    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+            <div class="text-[11px] font-bold uppercase text-slate-400">Ruleset Engine</div>
+            <div class="text-lg font-bold text-slate-900 mt-0.5">OWASP Coraza WAF</div>
+            <div class="text-xs text-emerald-600 font-semibold mt-1">● Caddy Reverse Proxy :5001</div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+            <div class="text-[11px] font-bold uppercase text-slate-400">Official OWASP CRS</div>
+            <div class="text-lg font-bold text-blue-600 mt-0.5">Release v4.10.0</div>
+            <div class="text-xs text-slate-500 mt-1">From official coreruleset repo</div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+            <div class="text-[11px] font-bold uppercase text-slate-400">Loaded CRS Signatures</div>
+            <div class="text-lg font-bold text-purple-600 mt-0.5">{{ total_crs_rules }} SecRules</div>
+            <div class="text-xs text-slate-500 mt-1">{{ crs_modules|length }} official .conf modules</div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+            <div class="text-[11px] font-bold uppercase text-slate-400">University Virtual Patches</div>
+            <div class="text-lg font-bold text-amber-600 mt-0.5">{{ rules|length }} Custom SecRules</div>
+            <div class="text-xs text-slate-500 mt-1">Dean Vault, IDOR, Forced Browsing</div>
+        </div>
     </div>
-    {% else %}
-    <div class="p-6 text-center text-xs text-slate-500 border border-dashed border-slate-200 rounded-lg">
-        No transactions recorded in <code class="font-mono">coraza_audit.log</code> yet. Switch OWASP Coraza WAF to DETECT or BLOCK and test a payload on port 5001.
-    </div>
-    {% endif %}
-</div>
 
-<!-- Active SecRules Table -->
-<div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
-    <h2 class="text-sm font-bold text-slate-900">Active OWASP Coraza SecRule Signatures (<code class="font-mono text-xs text-blue-600">coraza_rules.conf</code>)</h2>
-    <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse text-xs font-mono">
-            <thead>
-                <tr class="border-b border-slate-200 bg-slate-50 text-slate-500 uppercase">
-                    <th class="py-2.5 px-3">SecRule ID</th>
-                    <th class="py-2.5 px-3">Msg / Tag</th>
-                    <th class="py-2.5 px-3">Paranoia</th>
-                    <th class="py-2.5 px-3">Variables & @rx Operator</th>
-                    <th class="py-2.5 px-3">Status</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-200">
-                {% for r in rules %}
-                <tr>
-                    <td class="py-2.5 px-3 font-bold text-blue-700">id:{{ r.secrule_id }}</td>
-                    <td class="py-2.5 px-3 text-slate-800">{{ r.rule_id }} <span class="text-slate-400">({{ r.category }})</span></td>
-                    <td class="py-2.5 px-3">
-                        <span class="px-2 py-0.5 rounded text-[10px] font-bold {{ 'bg-blue-100 text-blue-800' if r.paranoia_level == 1 else 'bg-purple-100 text-purple-800' }}">
-                            L{{ r.paranoia_level }}
-                        </span>
-                    </td>
-                    <td class="py-2.5 px-3 text-slate-700 break-all">
-                        <span class="text-emerald-700 font-semibold">{{ r.secrule_target }}</span> "@rx {{ r.pattern }}"
-                    </td>
-                    <td class="py-2.5 px-3">
-                        <form action="{{ url_for('toggle_waf_rule', rule_pk=r.id) }}" method="POST">
-                            <button type="submit" class="px-2.5 py-1 rounded text-[10px] font-bold {{ 'bg-emerald-100 text-emerald-800 border border-emerald-300' if r.enabled else 'bg-slate-100 text-slate-500' }}">
-                                {{ 'ENABLED' if r.enabled else 'DISABLED' }}
-                            </button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <!-- Official OWASP CRS Modules Table -->
+    <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-sm font-bold text-slate-900">🏛️ Official OWASP ModSecurity Core Rule Set (CRS v4.10.0) Modules</h2>
+                <p class="text-xs text-slate-500">Every module below is actively loaded and evaluated in memory by the Caddy Coraza reverse proxy process:</p>
+            </div>
+            <span class="text-xs font-mono font-semibold text-slate-500">Path: ./owasp-crs/rules/</span>
+        </div>
+        <div class="overflow-x-auto max-h-80 border border-slate-200 rounded-lg">
+            <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                    <tr class="border-b border-slate-200 bg-slate-50 text-slate-600 uppercase font-mono">
+                        <th class="py-2.5 px-3">Module Filename</th>
+                        <th class="py-2.5 px-3">Attack Category / Protection Area</th>
+                        <th class="py-2.5 px-3">Rules</th>
+                        <th class="py-2.5 px-3">Size</th>
+                        <th class="py-2.5 px-3 text-right">Source Code</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 font-mono">
+                    {% for m in crs_modules %}
+                    <tr class="hover:bg-slate-50/80 transition">
+                        <td class="py-2 px-3 font-semibold text-blue-700">{{ m.filename }}</td>
+                        <td class="py-2 px-3 text-slate-800 font-sans">{{ m.title }}</td>
+                        <td class="py-2 px-3 text-purple-700 font-bold">{{ m.rules_count }}</td>
+                        <td class="py-2 px-3 text-slate-500">{{ m.size_kb }} KB</td>
+                        <td class="py-2 px-3 text-right">
+                            <a href="{{ url_for('view_crs_file', filename=m.filename) }}" class="inline-block px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] transition">
+                                🔍 View SecRules
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
-</div>
 
-<!-- Live Generated coraza_rules.conf File Preview -->
-<div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-2">
-    <div class="text-xs font-bold uppercase text-slate-500 font-mono">📄 Live Active <code class="text-slate-800">coraza_rules.conf</code> (Loaded by <code class="text-slate-800">coraza-waf.exe</code>)</div>
-    <pre class="p-4 rounded-lg bg-slate-900 text-slate-200 text-[11px] font-mono overflow-x-auto">{{ coraza_conf_text }}</pre>
+    <!-- Live Coraza Audit Logs -->
+    <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-sm font-bold text-slate-900">📡 Live OWASP Coraza JSON Audit Log (<code class="font-mono text-xs text-blue-600">coraza_audit.log</code>)</h2>
+                <p class="text-xs text-slate-500">Real-time alerts emitted by OWASP Coraza WAF during transaction inspection:</p>
+            </div>
+            <span class="text-xs font-mono text-slate-500">{{ logs|length }} recent events</span>
+        </div>
+        {% if logs %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs font-mono">
+                <thead>
+                    <tr class="border-b border-slate-200 bg-slate-50 text-slate-500 uppercase">
+                        <th class="py-2.5 px-3">Timestamp</th>
+                        <th class="py-2.5 px-3">Coraza TX ID</th>
+                        <th class="py-2.5 px-3">Triggered Official SecRule</th>
+                        <th class="py-2.5 px-3">Category</th>
+                        <th class="py-2.5 px-3">Request Payload</th>
+                        <th class="py-2.5 px-3">Verdict</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200">
+                    {% for log in logs %}
+                    <tr class="hover:bg-slate-50">
+                        <td class="py-2.5 px-3 text-slate-500 whitespace-nowrap">{{ log.timestamp }}</td>
+                        <td class="py-2.5 px-3 text-purple-700 font-semibold">{{ log.tx_id }}</td>
+                        <td class="py-2.5 px-3 font-bold text-slate-800 break-all">{{ log.rule_id }}</td>
+                        <td class="py-2.5 px-3 font-semibold text-slate-600">{{ log.category }}</td>
+                        <td class="py-2.5 px-3 text-slate-700 break-all max-w-xs">{{ log.http_method }} {{ log.matched_payload }}</td>
+                        <td class="py-2.5 px-3 whitespace-nowrap">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold {{ 'bg-rose-100 text-rose-800 border border-rose-200' if 'BLOCKED' in log.action_taken else 'bg-amber-100 text-amber-800 border border-amber-200' }}">
+                                {{ log.action_taken }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-6 text-center text-xs text-slate-500 border border-dashed border-slate-200 rounded-lg">
+            No transactions recorded in <code class="font-mono">coraza_audit.log</code> yet. Switch OWASP Coraza WAF to DETECT or BLOCK in the top bar and execute an attack on port 5001.
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Active University Virtual Patching Rules Table -->
+    <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-sm font-bold text-slate-900">🛡️ University Virtual Patching Rules (Business Logic Protection)</h2>
+                <p class="text-xs text-slate-500">Custom ModSecurity SecRules defending university-specific endpoints against IDOR, Burp Suite tampering, and forced browsing:</p>
+            </div>
+            <span class="text-xs font-mono font-semibold text-slate-500">{{ rules|length }} active rules</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs font-mono">
+                <thead>
+                    <tr class="border-b border-slate-200 bg-slate-50 text-slate-500 uppercase">
+                        <th class="py-2.5 px-3">SecRule ID</th>
+                        <th class="py-2.5 px-3">Rule Name & Category</th>
+                        <th class="py-2.5 px-3">Paranoia</th>
+                        <th class="py-2.5 px-3">SecRule Variables & Pattern</th>
+                        <th class="py-2.5 px-3">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200">
+                    {% for r in rules %}
+                    <tr>
+                        <td class="py-2.5 px-3 font-bold text-blue-700">id:{{ r.secrule_id }}</td>
+                        <td class="py-2.5 px-3 text-slate-800">{{ r.rule_id }} <span class="text-slate-400">({{ r.category }})</span></td>
+                        <td class="py-2.5 px-3">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold {{ 'bg-blue-100 text-blue-800' if r.paranoia_level == 1 else 'bg-purple-100 text-purple-800' }}">
+                                L{{ r.paranoia_level }}
+                            </span>
+                        </td>
+                        <td class="py-2.5 px-3 text-slate-700 break-all">
+                            <span class="text-emerald-700 font-semibold">{{ r.secrule_target }}</span> "@rx {{ r.pattern }}"
+                        </td>
+                        <td class="py-2.5 px-3">
+                            <form action="{{ url_for('toggle_waf_rule', rule_pk=r.id) }}" method="POST">
+                                <button type="submit" class="px-2.5 py-1 rounded text-[10px] font-bold {{ 'bg-emerald-100 text-emerald-800 border border-emerald-300' if r.enabled else 'bg-slate-100 text-slate-500' }}">
+                                    {{ 'ENABLED' if r.enabled else 'DISABLED' }}
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Add Custom SecRule -->
+    <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
+        <h2 class="text-sm font-bold text-slate-900">➕ Add Custom ModSecurity SecRule Signature</h2>
+        <form action="{{ url_for('add_waf_rule') }}" method="POST" class="grid grid-cols-1 sm:grid-cols-6 gap-3 text-xs">
+            <input type="text" name="rule_id" placeholder="WAF-CUSTOM-01" required class="px-3 py-2 rounded-lg bg-white border border-slate-300 font-mono">
+            <input type="text" name="category" placeholder="SQLi / XSS / BAC" required class="px-3 py-2 rounded-lg bg-white border border-slate-300 font-mono">
+            <select name="paranoia_level" class="px-3 py-2 rounded-lg bg-white border border-slate-300 font-mono">
+                <option value="1">Paranoia L1</option>
+                <option value="2">Paranoia L2</option>
+            </select>
+            <input type="text" name="pattern" placeholder="@rx regex pattern..." required class="sm:col-span-2 px-3 py-2 rounded-lg bg-white border border-slate-300 font-mono">
+            <input type="hidden" name="description" value="User-defined custom Coraza SecRule">
+            <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition">Add & Hot-Reload WAF</button>
+        </form>
+    </div>
+
+    <!-- Live Generated coraza_rules.conf File Preview -->
+    <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-2">
+        <div class="text-xs font-bold uppercase text-slate-500 font-mono">📄 Live Active <code class="text-slate-800">coraza_rules.conf</code> (Loaded by <code class="text-slate-800">coraza-waf.exe</code>)</div>
+        <pre class="p-4 rounded-lg bg-slate-900 text-slate-200 text-[11px] font-mono overflow-x-auto">{{ coraza_conf_text }}</pre>
+    </div>
 </div>
 {% endblock %}

@@ -1,57 +1,117 @@
-# VulnerableLMS - Web Security Laboratory
+# VulnerableLMS - Web Security Laboratory & OWASP Coraza WAF
 
-Учебная веб-лаборатория по веб-безопасности и тестированию Web Application Firewall (WAF), выполненная в виде университетского портала с журналом оценок, форумом курса и административным разделом.
+Учебная веб-лаборатория по веб-безопасности и практическому исследованию **Web Application Firewall (WAF)** enterprise-уровня. Лаборатория выполнена в виде университетского веб-портала с журналом оценок, форумом курса, административным пультом деканата и досье студентов.
 
-## Стек технологий
+---
 
-- **Backend:** Python 3 (Flask, SQLite3)
-- **Frontend:** HTML5, Tailwind CSS
-- **WAF:** OWASP Coraza WAF (Caddy v2 Reverse Proxy на порту 5001)
+## 🛡️ Архитектура безопасности и WAF
 
-## Модули лабораторной работы
+В проекте развернут **полноценный отдельный WAF-сервер (Reverse Proxy)** с официальным набором правил **OWASP ModSecurity Core Rule Set (CRS v4.10.0)**. Защита не имитируется кодом Python, а работает на уровне сетевого прокси.
 
-1. **SQL Injection (`/sqli`)** - поиск по журналу оценок студентов.
-2. **Cross-Site Scripting (`/xss`)** - Reflected XSS (поиск по материалам) и Stored XSS (форум курса).
-3. **Burp Suite Parameter Tampering (`/vault`)** - закрытый раздел деканата (подмена параметров `is_admin`, Base64-токенов сессии, подписей SHA-256 и HTTP-заголовков `X-Forwarded-For` / `X-Original-URL`).
-4. **Command Injection / RCE (`/rce`)** - сетевая диагностика сервера университета (инъекция команд ping, whoami, экранирование кавычек).
-5. **Path Traversal / LFI (`/lfi`)** - онлайн-ридер учебных материалов и экзаменационных ключей (обход относительных путей, чувствительные файлы).
-6. **Server-Side Request Forgery (`/ssrf`)** - импортер внешних учебных ресурсов (обращение к закрытой внутренней микрослужбе ключей через обходные кодировки IP).
-7. **Forced Browsing / Broken URL Access Control (`/portal/<path>`)** - скрытые административные консоли и пульты деканата (прямое манипулирование URL в адресной строке браузера, обход блэклистов и префиксов).
-8. **Cross-Site Request Forgery (`/csrf`)** - смена почтовых уведомлений студента без ведома пользователя (эксплуатация через Burp Suite с подменой заголовков Referer и методов запроса).
+```
+       [ Браузер студента / Burp Suite / curl ]
+                          │
+                          ▼  (Порт 5001 - Публичный вход)
+     ┌──────────────────────────────────────────────────┐
+     │      OWASP Coraza WAF (Caddy v2 Reverse Proxy)   │
+     │      Процесс: coraza-waf.exe                     │
+     │                                                  │
+     │  1. Официальный OWASP CRS v4.10.0:              │
+     │     - 25 официальных модулей (661 SecRule)       │
+     │     - crs-setup.conf + rules/*.conf              │
+     │     - SQLi, XSS, RCE, LFI, SSRF, Scanners        │
+     │                                                  │
+     │  2. University Virtual Patching (Бизнес-логика): │
+     │     - IDOR, Burp Suite Tampering, Forced Browsing│
+     │                                                  │
+     │  3. Режимы: OFF / DETECT (IDS) / BLOCK (IPS)     │
+     │     Paranoia Level: L1 / L2                      │
+     └────────────────────────┬─────────────────────────┘
+                              │ Запрос чист (или DETECT)
+                              ▼ (Порт 5002 - Внутренний)
+     ┌──────────────────────────────────────────────────┐
+     │        VulnerableLMS Backend (Flask + SQLite)    │
+     │        Процесс: python app.py                    │
+     │        Фильтры кода: Low / Medium / High / Safe  │
+     └──────────────────────────────────────────────────┘
+```
 
-## Режимы защиты
+---
 
-- **Сложность кода приложения (`Code Security`):**
-  - `Low` - фильтрация отключена.
-  - `Medium` - базовая фильтрация (блокировка стандартных пробелов, тегов `<script>`, базовых полей).
-  - `High` - расширенная фильтрация (блокировка комментариев, кавычек, стандартных сигнатур).
-  - `Impossible` - безопасный код (параметризованные SQL-запросы, экранирование HTML, серверная проверка прав).
+## 🏛️ Официальный набор правил OWASP CRS (v4.10.0)
 
-- **OWASP Coraza WAF:**
-  - `OFF` - WAF отключен (`SecRuleEngine Off`).
-  - `DETECT` - режим обнаружения (`DetectionOnly`), фиксирует атаки в лог и выводит уведомление.
-  - `BLOCK` - активная блокировка (`SecRuleEngine On`), прерывает вредоносные запросы с ответом `HTTP 403 Forbidden`.
-  - **Paranoia Level:** `L1` (базовые правила) и `L2` (строгие правила, проверка заголовков и обходов).
+Правила загружены напрямую из официального репозитория OWASP ([github.com/coreruleset/coreruleset](https://github.com/coreruleset/coreruleset)) и расположены в каталоге `owasp-crs/`:
 
-## Запуск проекта
+* `owasp-crs/crs-setup.conf` — официальный конфигурационный файл параметров CRS (пороги Anomaly Scoring, Paranoia Level, политики инспекции).
+* `owasp-crs/rules/` — **25 официальных файлов правил ModSecurity SecLang (661 правило):**
+  * `REQUEST-942-APPLICATION-ATTACK-SQLI.conf` (SQL Injection Protection — 53 правила, интеграция libinjection)
+  * `REQUEST-941-APPLICATION-ATTACK-XSS.conf` (Cross-Site Scripting — 42 правила, фильтрация тегов, событий DOM)
+  * `REQUEST-932-APPLICATION-ATTACK-RCE.conf` (Remote Command Execution — 48 правил, шелл-бинарники, пайпы)
+  * `REQUEST-930-APPLICATION-ATTACK-LFI.conf` (Local File Inclusion / Path Traversal — 21 правило)
+  * `REQUEST-931-APPLICATION-ATTACK-RFI.conf` (Remote File Inclusion)
+  * `REQUEST-934-APPLICATION-ATTACK-GENERIC.conf` (SSRF, инъекции в NodeJS/серверные среды)
+  * `REQUEST-913-SCANNER-DETECTION.conf` (Детектирование сканеров: sqlmap, nikto, acunetix, gobuster)
+  * `REQUEST-920-PROTOCOL-ENFORCEMENT.conf` (Контроль спецификаций HTTP RFC)
+  * `REQUEST-944-APPLICATION-ATTACK-JAVA.conf` (Десериализация Java, Log4Shell / JNDI)
+  * `REQUEST-949-BLOCKING-EVALUATION.conf` (Итоговая оценка Anomaly Score и блокировка)
+  * И словари сигнатур `.data` (scanners-user-agents, unix-shell, windows-powershell, restricted-files).
 
-### 1. Установка зависимостей
+Все правила можно просмотреть как в директории `owasp-crs/rules/`, так и прямо в веб-интерфейсе через консоль WAF по адресу: **http://127.0.0.1:5001/waf-dashboard**.
+
+---
+
+## 🎯 Двухуровневая модель защиты (2-Tier Defense)
+
+1. **Базовый уровень (Generic Web Attacks):** Официальный OWASP Core Rule Set пресекает классические векторы атак (SQLi, XSS, RCE, LFI, SSRF).
+2. **Уровень виртуального патчинга (Business Logic Virtual Patching):** Специализированные SecRules защищают уникальную университетскую логику (подмену ролей `is_admin` и токенов сессий в Burp Suite `/vault`, обращение к досье декана по IDOR `/idor`, скрытые админки `/portal/admin-console`).
+
+---
+
+## 🚀 Быстрый запуск
+
+### 1. Установка зависимостей Python
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Запуск приложения
+### 2. Запуск лабораторной работы
 ```bash
 python app.py
 ```
 
 При запуске автоматически:
-- Инициализируется база данных SQLite (`security_lab.db`).
-- Стартует бэкенд Flask на внутреннем порту `5002`.
-- Запускается прокси OWASP Coraza WAF на публичном порту `5001`. Если бинарный файл `coraza-waf.exe` отсутствует, он будет автоматически загружен при первом старте.
+1. Проверяется наличие бинарного файла `coraza-waf.exe` (при отсутствии скачивается официальный бинарник Caddy v2 с Coraza).
+2. Проверяется наличие официального каталога `owasp-crs/`.
+3. Генерируются конфигурационные файлы `coraza_rules.conf` и `Caddyfile`.
+4. Запускается отдельный фоновый процесс **OWASP Coraza WAF на порту 5001**.
+5. Запускается бэкенд Flask на порту 5002.
 
 ### 3. Открытие в браузере
-Перейдите по адресу: **http://127.0.0.1:5001**
+* Публичный веб-портал (через WAF): **http://127.0.0.1:5001**
+* Панель управления WAF и аудит-лог: **http://127.0.0.1:5001/waf-dashboard**
+* Автоматический сканер уязвимостей: **http://127.0.0.1:5001/scanner**
 
-## Тестовые пейлоады
-Готовые векторы атак для всех уровней сложности и демонстрации обхода WAF собраны в файле [PAYLOADS.txt](PAYLOADS.txt).
+---
+
+## 👨‍🏫 Как продемонстрировать WAF преподавателю
+
+1. **Доказательство отдельного процесса WAF в ОС:**
+   В PowerShell:
+   ```powershell
+   Get-Process coraza-waf
+   netstat -ano | findstr :5001
+   netstat -ano | findstr :5002
+   ```
+   Преподаватель увидит системный процесс `coraza-waf.exe`, слушающий порт `5001` (Reverse Proxy), и процесс Python на порту `5002`.
+
+2. **Демонстрация официальных файлов OWASP CRS:**
+   * Откройте папку `owasp-crs/rules/` в VS Code или перейдите в веб-интерфейсе на `/waf-dashboard`.
+   * Покажите файл `owasp-crs/rules/REQUEST-942-APPLICATION-ATTACK-SQLI.conf` (официальные комментарии OWASP, правила `id:942100`, проверка через libinjection).
+
+3. **Сравнение прямого доступа и прокси WAF:**
+   * Включите режим `WAF: BLOCK` в верхнем меню.
+   * Отправьте SQL-инъекцию через WAF: `http://127.0.0.1:5001/sqli?query=' OR 1=1 --` — WAF перехватит запрос и выдаст страницу `403 Forbidden (Blocked by OWASP Coraza WAF)`.
+   * Отправьте тот же запрос напрямую бэкенду в обход WAF: `http://127.0.0.1:5002/sqli?query=' OR 1=1 --` — база вернет оценки студентов (атака успешна). Это наглядно доказывает, что блокировку выполняет именно Reverse Proxy WAF.
+
+4. **Просмотр промышленного JSON аудит-лога:**
+   Откройте файл `coraza_audit.log` или страницу `/waf-dashboard`. Каждое срабатывание содержит `id` официального правила OWASP CRS (например, `id: 942100`), имя файла (`REQUEST-942-APPLICATION-ATTACK-SQLI.conf`), Transaction ID и детали атаки.
